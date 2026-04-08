@@ -1,0 +1,12 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+<div class="container">
+    <h2>👋 ยินดีต้อนรับ {{ request.user.username }}</h2>
+
+    <p><a href="/checkin/">👉 ไปเช็คอิน</a></p>
+    <p><a href="/history/">📜 ดูประวัติ</a></p>
+
+    <br>
+    <a href="/logout/">🚪 Logout</a>
+</div>

@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<style>
+    .history-card {
+        background: rgb(255, 255, 255);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        margin-top: 20px;
+    }
+
+    .status-present {
+        color: #38ac3e;
+        font-weight: bold;
+    }
+
+    .status-late {
+        color: #c62828;
+        font-weight: bold;
+    }
+
+    .table th {
+        text-align: center;
+        vertical-align: middle;
+        font-size: 14px;
+        letter-spacing: 0.5px;
+    }
+
+    .table td {
+        text-align: center;
+        vertical-align: middle;
+    }
+</style>
+
+<div class="history-card">
+    <h2>📜 ประวัติการเช็คอิน</h2>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover">
+
+            <!-- 🔥 หัวตารางใหม่ -->
+            <tr style="background: linear-gradient(135deg, #3b82f6, #1e40af); color:white;">
+                <th>#</th>
+                <th>📅 วันที่</th>
+                <th>🟢 เวลาเข้า</th>
+                <th>🔴 เวลาออก</th>
+                <th>📊 สถานะ</th>
+                <th>📍 พิกัด</th>
+            </tr>
+
+            {% for item in data %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+
+                <td>{{ item.date }}</td>
+
+                <td>
+                    {{ item.check_in_time|date:"H:i:s" }}
+                </td>
+
+                <td>
+                    {{ item.check_out_time|date:"H:i:s"|default:"-" }}
+                </td>
+
+                <td>
+                    {% if item.status == "late" %}
+                    <span class="status-late">มาสาย</span>
+                    {% else %}
+                    <span class="status-present">มาปกติ</span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {{ item.latitude|default:"-" }}, {{ item.longitude|default:"-" }}
+                </td>
+            </tr>
+
+            {% empty %}
+            <tr>
+                <td colspan="6">ยังไม่มีข้อมูลการเช็คอิน</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+{% endblock %}

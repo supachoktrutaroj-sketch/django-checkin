@@ -1,0 +1,213 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load static %}
+{% block content %}
+
+<style>
+    .login-page {
+        min-height: calc(100vh - 120px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 30px 15px;
+    }
+
+    .login-wrapper {
+        width: 100%;
+        max-width: 900px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        background: white;
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
+    }
+
+    /* ซ้าย */
+    .login-left {
+        background: linear-gradient(135deg, #2563eb, #1d4ed8, #0f172a);
+        color: white;
+        padding: 45px 30px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .logo {
+        width: 90px;
+        height: 90px;
+        object-fit: contain;
+        margin: 0 auto 15px;
+        background: white;
+        border-radius: 50%;
+        padding: 12px;
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+    }
+
+    .login-left h1 {
+        font-size: 28px;
+        margin-top: 10px;
+    }
+
+    .login-left p {
+        font-size: 14px;
+        margin-top: 10px;
+        opacity: 0.9;
+    }
+
+    .feature-list {
+        margin-top: 20px;
+        list-style: none;
+        padding: 0;
+        text-align: left;
+    }
+
+    .feature-list li {
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+
+    /* ขวา */
+    .login-right {
+        padding: 35px 25px;
+        background: #f8fafc;
+        display: flex;
+        align-items: center;
+    }
+
+    .login-form-card {
+        background: white;
+        border-radius: 18px;
+        padding: 28px;
+        width: 100%;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+    }
+
+    .form-title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    .form-subtitle {
+        font-size: 13px;
+        color: #6b7280;
+        margin-bottom: 18px;
+    }
+
+    .form-group {
+        margin-bottom: 14px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        font-size: 13px;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 11px;
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        font-size: 14px;
+    }
+
+    .form-group input:focus {
+        border-color: #2563eb;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .login-btn {
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+        border: none;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 8px;
+    }
+
+    .login-btn:hover {
+        transform: translateY(-1px);
+    }
+
+    .error-box {
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 10px;
+        border-radius: 10px;
+        margin-bottom: 12px;
+        font-size: 13px;
+    }
+
+    @media (max-width: 768px) {
+        .login-wrapper {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="login-page">
+    <div class="login-wrapper">
+
+        <!-- ซ้าย -->
+        <div class="login-left">
+
+            <!-- 🔥 โลโก้ -->
+            <img src="{% static 'images/logo.png' %}" class="logo" alt="logo">
+
+            <h1>ระบบเช็คชื่อ</h1>
+            <p>ระบบบันทึกเวลาเข้า-ออก ด้วย GPS</p>
+
+            <ul class="feature-list">
+                <li>✅ เช็คอินด้วยตำแหน่งจริง</li>
+                <li>✅ บันทึกเวลาอัตโนมัติ</li>
+                <li>✅ ดูประวัติย้อนหลังได้</li>
+                <li>✅ มีระบบผู้ดูแล</li>
+            </ul>
+        </div>
+
+        <!-- ขวา -->
+        <div class="login-right">
+            <div class="login-form-card">
+
+                <div class="form-title">เข้าสู่ระบบ</div>
+                <div class="form-subtitle">กรอกข้อมูลเพื่อเข้าใช้งาน</div>
+
+                {% if error %}
+                <div class="error-box">
+                    {{ error }}
+                </div>
+                {% endif %}
+
+                <form method="POST">
+                    {% csrf_token %}
+
+                    <div class="form-group">
+                        <label>ชื่อผู้ใช้</label>
+                        <input type="text" name="username" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>รหัสผ่าน</label>
+                        <input type="password" name="password" required>
+                    </div>
+
+                    <button type="submit" class="login-btn">
+                        🔐 เข้าสู่ระบบ
+                    </button>
+                </form>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

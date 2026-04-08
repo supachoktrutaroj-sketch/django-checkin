@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<style>
+    .checkin-card {
+        background: white;
+        padding: 24px;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        max-width: 900px;
+        margin: 20px auto;
+    }
+
+    .checkin-title {
+        margin-bottom: 6px;
+        font-size: 28px;
+        font-weight: 700;
+        color: #1f2937;
+    }
+
+    .location-title {
+        margin-bottom: 16px;
+        font-size: 18px;
+        color: #4b5563;
+    }
+
+    .status-box {
+        margin-top: 15px;
+        padding: 14px 16px;
+        border-radius: 12px;
+        font-weight: bold;
+        font-size: 15px;
+    }
+
+    .status-ok {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #81c784;
+    }
+
+    .status-bad {
+        background: #ffebee;
+        color: #c62828;
+        border: 1px solid #ef9a9a;
+    }
+
+    .info-box {
+        margin-top: 18px;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 16px;
+        line-height: 1.8;
+    }
+
+    .btn-group {
+        margin-top: 18px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .action-btn {
+        min-width: 180px;
+        padding: 14px 22px;
+        border: none;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 700;
+        color: white;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    }
+
+    .btn-checkin {
+        background: linear-gradient(135deg, #22c55e, #15803d);
+    }
+
+    .btn-checkin:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(34, 197, 94, 0.28);
+    }
+
+    .btn-checkout {
+        background: linear-gradient(135deg, #ef4444, #b91c1c);
+    }
+
+    .btn-checkout:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(239, 68, 68, 0.28);
+    }
+
+    .action-btn:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+    }
+
+    .error-text {
+        color: #c62828;
+        font-weight: bold;
+        margin-top: 10px;
+    }
+
+    .map-title {
+        margin-top: 22px;
+        margin-bottom: 10px;
+        font-size: 18px;
+        font-weight: bold;
+        color: #1f2937;
+    }
+
+    #map {
+        height: 400px;
+        width: 100%;
+        border-radius: 14px;
+        overflow: hidden;
+    }
+
+    @media (max-width: 768px) {
+        .checkin-card {
+            padding: 18px;
+            margin: 12px;
+        }
+
+        .action-btn {
+            width: 100%;
+        }
+
+        .checkin-title {
+            font-size: 24px;
+        }
+
+        #map {
+            height: 320px;
+        }
+    }
+</style>
+
+<div class="checkin-card">
+    <h2 class="checkin-title">📍 Check In / Check Out</h2>
+    <h3 class="location-title">{{ location_name }}</h3>
+
+    {% if error %}
+    <p class="error-text">{{ error }}</p>
+    {% endif %}
+
+    <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="latitude" id="lat">
+        <input type="hidden" name="longitude" id="lon">
+
+        <div class="btn-group">
+            <button class="action-btn btn-checkin" type="submit" name="action" value="checkin" id="checkinBtn">
+                ✅ เช็คอิน
+            </button>
+
+            <button class="action-btn btn-checkout" type="submit" name="action" value="checkout" id="checkoutBtn">
+                🔴 เช็คเอาต์
+            </button>
+        </div>
+    </form>
+
+    <div class="info-box">
+        <p><strong>พิกัดจุดเช็คอิน:</strong> {{ office_lat }}, {{ office_lon }}</p>
+        <p><strong>รัศมีที่อนุญาต:</strong> {{ allowed_radius }} เมตร</p>
+        <p><strong>ระยะห่างปัจจุบัน:</strong> <span id="distanceText">กำลังคำนวณ...</span></p>
+    </div>
+
+    <div id="statusBox" class="status-box status-bad">
+        กำลังโหลด GPS...
+    </div>
+
+    <div class="map-title">🗺️ แผนที่ตำแหน่ง</div>
+    <div id="map"></div>
+</div>
+
+<script>
+    let map;
+    let marker;
+    let officeCircle;
+
+    const officeLat = parseFloat("{{ office_lat|default:'0' }}");
+    const officeLon = parseFloat("{{ office_lon|default:'0' }}");
+    const allowedRadius = parseFloat("{{ allowed_radius|default:'100' }}");
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const toRad = (value) => value * Math.PI / 180;
+
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    function setStatus(ok, message) {
+        const box = document.getElementById("statusBox");
+        box.className = ok ? "status-box status-ok" : "status-box status-bad";
+        box.innerText = message;
+    }
+
+    function setButtonsEnabled(enabled) {
+        document.getElementById("checkinBtn").disabled = !enabled;
+        document.getElementById("checkoutBtn").disabled = !enabled;
+    }
+
+    function initMap() {
+        const officeLocation = { lat: officeLat, lng: officeLon };
+
+        map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 16,
+            center: officeLocation,
+        });
+
+        new google.maps.Marker({
+            position: officeLocation,
+            map: map,
+            title: "จุดเช็คอิน"
+        });
+
+        officeCircle = new google.maps.Circle({
+            strokeColor: "#22c55e",
+            strokeOpacity: 0.8,
+            strokeWeight: 2,
+            fillColor: "#22c55e",
+            fillOpacity: 0.2,
+            map: map,
+            center: officeLocation,
+            radius: allowedRadius
+        });
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function (position) {
+                    const userLat = position.coords.latitude;
+                    const userLon = position.coords.longitude;
+
+                    document.getElementById("lat").value = userLat;
+                    document.getElementById("lon").value = userLon;
+
+                    const userLocation = { lat: userLat, lng: userLon };
+
+                    marker = new google.maps.Marker({
+                        position: userLocation,
+                        map: map,
+                        title: "ตำแหน่งของคุณ",
+                        icon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+                    });
+
+                    map.setCenter(userLocation);
+
+                    const distance = calculateDistance(userLat, userLon, officeLat, officeLon);
+                    document.getElementById("distanceText").innerText = Math.round(distance) + " เมตร";
+
+                    if (distance <= allowedRadius) {
+                        setStatus(true, "✅ อยู่ในพื้นที่ที่กำหนด สามารถเช็คอินและเช็คเอาต์ได้");
+                        setButtonsEnabled(true);
+                    } else {
+                        setStatus(false, "❌ อยู่นอกพื้นที่ที่กำหนด ยังไม่สามารถดำเนินการได้");
+                        setButtonsEnabled(false);
+                    }
+                },
+                function () {
+                    setStatus(false, "❌ ไม่สามารถดึง GPS ได้ กรุณาอนุญาต location");
+                    document.getElementById("distanceText").innerText = "-";
+                    setButtonsEnabled(false);
+                }
+            );
+        } else {
+            setStatus(false, "❌ เบราว์เซอร์นี้ไม่รองรับ GPS");
+            document.getElementById("distanceText").innerText = "-";
+            setButtonsEnabled(false);
+        }
+    }
+</script>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAdEA5DMsDjS26MJotjMxeXkDRxbZZo_dY&callback=initMap" async
+    defer></script>
+
+{% endblock %}
