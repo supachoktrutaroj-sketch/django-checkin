@@ -24,7 +24,6 @@
         border-radius: 10px;
         text-decoration: none;
         font-weight: bold;
-        display: inline-block;
     }
 
     .summary-grid {
@@ -40,11 +39,6 @@
         padding: 18px;
         text-align: center;
         font-weight: bold;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-    }
-
-    .summary-card h2 {
-        margin: 10px 0 0;
     }
 
     .bg-blue {
@@ -67,56 +61,7 @@
         background: white;
         border-radius: 14px;
         padding: 20px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
         margin-bottom: 25px;
-    }
-
-    .filter-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
-        margin-top: 15px;
-    }
-
-    .filter-grid input,
-    .filter-grid select,
-    .filter-grid button,
-    .filter-grid a {
-        padding: 10px 12px;
-        border-radius: 10px;
-        border: 1px solid #d1d5db;
-        text-decoration: none;
-        box-sizing: border-box;
-    }
-
-    .filter-grid button {
-        background: #2563eb;
-        color: white;
-        border: none;
-        font-weight: bold;
-        cursor: pointer;
-    }
-
-    .filter-grid a {
-        background: #f3f4f6;
-        color: #111827;
-        text-align: center;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .table th {
-        background: linear-gradient(135deg, #3b82f6, #1e40af);
-        color: white;
-        text-align: center;
-        vertical-align: middle;
-    }
-
-    .table td {
-        text-align: center;
-        vertical-align: middle;
     }
 
     .status-present {
@@ -128,18 +73,6 @@
         color: #b91c1c;
         font-weight: bold;
     }
-
-    .latest-user {
-        font-size: 18px;
-        font-weight: bold;
-    }
-
-    .empty-text {
-        text-align: center;
-        font-weight: bold;
-        color: #6b7280;
-        padding: 20px 0;
-    }
 </style>
 
 <div class="top-bar">
@@ -150,6 +83,7 @@
     </a>
 </div>
 
+<!-- SUMMARY -->
 <div class="summary-grid">
     <div class="summary-card bg-blue">
         เช็คอินวันนี้
@@ -172,80 +106,120 @@
     </div>
 </div>
 
+<!-- ล่าสุด -->
 <div class="box">
-    <h4>📌 คนล่าสุดที่เช็คอินวันนี้</h4>
+    <h4>📌 คนล่าสุดที่ทำรายการ</h4>
     {% if latest_record %}
-    <p class="latest-user">
+    <p>
         {{ latest_record.user.username }} -
-        {{ latest_record.check_in_time|date:"H:i:s" }}
+        {{ latest_record.created_at|date:"d/m/Y H:i:s" }}
     </p>
     {% else %}
-    <p>ยังไม่มีคนเช็คอินวันนี้</p>
+    <p>ยังไม่มีข้อมูลวันนี้</p>
     {% endif %}
 </div>
 
-<div class="box">
-    <h4>🔎 ค้นหาและกรองข้อมูล</h4>
-
-    <form method="GET">
-        <div class="filter-grid">
-            <input type="text" name="q" placeholder="ค้นหาชื่อผู้ใช้" value="{{ q }}">
-            <input type="date" name="date" value="{{ date }}">
-
-            <select name="status">
-                <option value="">-- สถานะทั้งหมด --</option>
-                <option value="present">มาปกติ</option>
-                <option value="late">มาสาย</option>
-                <option value="leave">ลา</option>
-                <option value="absent">ขาด</option>
-            </select>
-
-            <button type="submit">ค้นหา</button>
-            <a href="{% url 'admin_dashboard' %}">ล้างค่า</a>
-        </div>
-    </form>
-</div>
-
+<!-- TABLE -->
 <div class="box">
     <h4>📋 รายการทั้งหมด</h4>
 
-    <div class="table-responsive">
-        <table class="table table-bordered table-hover">
-            <tr>
-                <th>#</th>
-                <th>ผู้ใช้</th>
-                <th>วันที่</th>
-                <th>เวลาเข้า</th>
-                <th>เวลาออก</th>
-                <th>สถานะ</th>
-                <th>พิกัด</th>
-            </tr>
+    <table border="1" style="width:100%; border-collapse:collapse;">
+        <tr style="background:#1e40af; color:white;">
+            <th>#</th>
+            <th>ชื่อผู้ใช้</th>
+            <th>วันที่</th>
+            <th>เวลา</th>
+            <th>ประเภท</th>
+            <th>สถานะ</th>
+            <th>พิกัด</th>
+            <th>ระยะ</th>
+        </tr>
 
-            {% for item in records %}
-            <tr>
-                <td>{{ forloop.counter }}</td>
-                <td>{{ item.user.username }}</td>
-                <td>{{ item.date }}</td>
-                <td>{{ item.check_in_time|date:"H:i:s"|default:"-" }}</td>
-                <td>{{ item.check_out_time|date:"H:i:s"|default:"-" }}</td>
-                <td>
-                    {% if item.status == 'late' %}
-                    <span class="status-late">มาสาย</span>
-                    {% elif item.status == 'present' %}
-                    <span class="status-present">มาปกติ</span>
-                    {% else %}
-                    {{ item.get_status_display }}
-                    {% endif %}
-                </td>
-                <td>{{ item.latitude|default:"-" }}, {{ item.longitude|default:"-" }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="7" class="empty-text">ยังไม่มีข้อมูล</td>
-            </tr>
-            {% endfor %}
-        </table>
+        {% for item in records %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+
+            <td>{{ item.user.username }}</td>
+
+            <td>{{ item.created_at|date:"d/m/Y" }}</td>
+
+            <td>{{ item.created_at|time:"H:i:s" }}</td>
+
+            <td>
+                {% if item.action == 'checkin' %}
+                <span style="color:green;">เข้างาน</span>
+                {% else %}
+                <span style="color:red;">ออกงาน</span>
+                {% endif %}
+            </td>
+
+            <td>
+                {% if item.status == 'late' %}
+                <span class="status-late">มาสาย</span>
+                {% else %}
+                <span class="status-present">ปกติ</span>
+                {% endif %}
+            </td>
+
+            <td>{{ item.latitude }}, {{ item.longitude }}</td>
+
+            <td>{{ item.distance|floatformat:2 }} m</td>
+        </tr>
+
+        {% empty %}
+        <tr>
+            <td colspan="8" style="text-align:center;">ยังไม่มีข้อมูล</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% if show_return_alert %}
+<div class="box" style="background:#fee2e2; border:1px solid #dc2626;">
+    <h4 style="color:#b91c1c;">⚠ แจ้งเตือน</h4>
+    <p>
+        ตอนนี้เกินเวลา {{ return_deadline }} แล้ว
+        และยังมีผู้ที่ยังไม่กลับ <strong>{{ not_returned_count }}</strong> คน
+    </p>
+</div>
+{% endif %}
+
+<div class="summary-grid">
+    <div class="summary-card bg-green">
+        กลับแล้ว
+        <h2>{{ returned_count }}</h2>
+    </div>
+
+    <div class="summary-card bg-red">
+        ยังไม่กลับ
+        <h2>{{ not_returned_count }}</h2>
     </div>
 </div>
 
+<div class="box">
+    <h4>🚨 รายชื่อคนที่ยังไม่กลับ</h4>
+
+    {% if not_returned_users %}
+    <table border="1" style="width:100%; border-collapse:collapse;">
+        <tr style="background:#dc2626; color:white;">
+            <th>#</th>
+            <th>ชื่อผู้ใช้</th>
+            <th>เวลาออก</th>
+            <th>พิกัด</th>
+            <th>ระยะ</th>
+        </tr>
+
+        {% for item in not_returned_users %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ item.user.username }}</td>
+            <td>{{ item.created_at|time:"H:i:s" }}</td>
+            <td>{{ item.latitude }}, {{ item.longitude }}</td>
+            <td>{{ item.distance|floatformat:2 }} m</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <p style="color:green; font-weight:bold;">ทุกคนกลับแล้ว</p>
+    {% endif %}
+</div>
 {% endblock %}

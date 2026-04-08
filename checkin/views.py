@@ -1,5 +1,7 @@
 import math
 import json
+import urllib.request
+import urllib.error
 from datetime import time
 
 from django.shortcuts import render, redirect
@@ -9,15 +11,31 @@ from django.utils import timezone
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db.models import Count, Q
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.conf import settings
+from django.core.cache import cache
+from django.views.decorators.csrf import csrf_exempt
 
 import openpyxl
 
-from .models import Attendance
+from .models import CheckInRecord
+
+
+@csrf_exempt
+def line_webhook(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body.decode('utf-8'))
+            print("LINE EVENT:", body)
+        except Exception as e:
+            print("LINE WEBHOOK ERROR:", str(e))
+        return JsonResponse({'status': 'ok'})
+
+    return JsonResponse({'message': 'ok'})
 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
-    R = 6371000  # เมตร
+    r = 6371000  # เมตร
 
     phi1 = math.radians(float(lat1))
     phi2 = math.radians(float(lat2))
@@ -27,16 +45,146 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
-    return R * c
+    return r * c
 
 
 def calculate_status(checkin_datetime):
-    late_time = time(8, 30)  # 08:30
+    late_time = time(8, 30)
     local_time = timezone.localtime(checkin_datetime).time()
+    return "late" if local_time > late_time else "present"
 
-    if local_time > late_time:
-        return 'late'
-    return 'present'
+
+def get_return_status_summary():
+    today = timezone.localdate()
+
+    today_records = (
+        CheckInRecord.objects
+        .filter(created_at__date=today)
+        .select_related('user')
+        .order_by('user_id', '-created_at')
+    )
+
+    latest_by_user = {}
+    for record in today_records:
+        if record.user_id not in latest_by_user:
+            latest_by_user[record.user_id] = record
+
+    returned_users = []
+    not_returned_users = []
+
+    for _, record in latest_by_user.items():
+        if record.action == 'checkin':
+            returned_users.append(record)
+        elif record.action == 'checkout':
+            not_returned_users.append(record)
+
+    return returned_users, not_returned_users
+
+
+def build_line_summary_message(trigger_record=None):
+    returned_users, not_returned_users = get_return_status_summary()
+
+    returned_count = len(returned_users)
+    not_returned_count = len(not_returned_users)
+
+    now_local = timezone.localtime()
+    deadline = now_local.replace(
+        hour=getattr(settings, 'RETURN_DEADLINE_HOUR', 18),
+        minute=getattr(settings, 'RETURN_DEADLINE_MINUTE', 0),
+        second=0,
+        microsecond=0,
+    )
+
+    lines = []
+
+    if trigger_record:
+        action_text = 'กลับเข้ากรม' if trigger_record.action == 'checkin' else 'ออกนอกกรม'
+        lines.append("📢 มีการอัปเดตการเช็คชื่อ")
+        lines.append(f"ชื่อ: {trigger_record.user.username}")
+        lines.append(f"รายการ: {action_text}")
+        lines.append(f"เวลา: {timezone.localtime(trigger_record.created_at).strftime('%H:%M:%S')}")
+        lines.append("")
+
+    lines.append(f"✅ กลับแล้ว: {returned_count} คน")
+    lines.append(f"⏳ ยังไม่กลับ: {not_returned_count} คน")
+
+    if not_returned_users:
+        lines.append("")
+        lines.append("รายชื่อที่ยังไม่กลับ:")
+        for i, item in enumerate(not_returned_users[:20], start=1):
+            out_time = timezone.localtime(item.created_at).strftime('%H:%M:%S')
+            lines.append(f"{i}. {item.user.username} (ออก {out_time})")
+
+        if len(not_returned_users) > 20:
+            lines.append(f"... และอีก {len(not_returned_users) - 20} คน")
+
+    if now_local > deadline and not_returned_count > 0:
+        lines.append("")
+        lines.append(
+            f"🚨 เลยเวลากลับ {deadline.strftime('%H:%M')} แล้ว "
+            f"แต่ยังมีผู้ที่ไม่กลับ {not_returned_count} คน"
+        )
+
+    return "\n".join(lines)
+
+
+def send_line_push_message(message_text):
+    channel_access_token = getattr(settings, 'LINE_CHANNEL_ACCESS_TOKEN', '').strip()
+    target_id = getattr(settings, 'LINE_TARGET_ID', '').strip()
+
+    if not channel_access_token or not target_id:
+        return False, "LINE settings not configured"
+
+    url = "https://api.line.me/v2/bot/message/push"
+    payload = json.dumps({
+        "to": target_id,
+        "messages": [
+            {
+                "type": "text",
+                "text": message_text[:5000]
+            }
+        ]
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {channel_access_token}",
+        }
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            return True, response.read().decode("utf-8", errors="ignore")
+    except urllib.error.HTTPError as e:
+        try:
+            detail = e.read().decode("utf-8", errors="ignore")
+        except Exception:
+            detail = str(e)
+        return False, detail
+    except Exception as e:
+        return False, str(e)
+
+
+def notify_line_return_status(trigger_record=None):
+    """
+    กันข้อความซ้ำถี่เกินไป 1 นาทีต่อสถานะเดียวกัน
+    """
+    message_text = build_line_summary_message(trigger_record=trigger_record)
+    cache_key = f"line_notify:{hash(message_text)}"
+
+    if cache.get(cache_key):
+        return False, "duplicate skipped"
+
+    ok, result = send_line_push_message(message_text)
+
+    if ok:
+        cache.set(cache_key, True, timeout=60)
+
+    return ok, result
 
 
 def login_view(request):
@@ -49,10 +197,10 @@ def login_view(request):
         if user is not None:
             login(request, user)
             return redirect('dashboard')
-        else:
-            return render(request, 'login.html', {
-                'error': 'Username หรือ Password ไม่ถูกต้อง'
-            })
+
+        return render(request, 'login.html', {
+            'error': 'Username หรือ Password ไม่ถูกต้อง'
+        })
 
     return render(request, 'login.html')
 
@@ -71,32 +219,35 @@ def home(request):
 def dashboard(request):
     today = timezone.localdate()
 
-    data = Attendance.objects.filter(user=request.user).order_by('-date', '-check_in_time')
+    data = CheckInRecord.objects.filter(user=request.user).select_related('user').order_by('-created_at')
 
-    today_records = Attendance.objects.filter(date=today)
-    total_checkin = today_records.filter(check_in_time__isnull=False).count()
-    late_count = today_records.filter(status='late').count()
-    checkout_count = today_records.filter(check_out_time__isnull=False).count()
+    today_records = CheckInRecord.objects.filter(created_at__date=today)
+    total_checkin = today_records.filter(action='checkin').count()
+    late_count = today_records.filter(action='checkin', status='late').count()
+    checkout_count = today_records.filter(action='checkout').count()
 
     total_users = User.objects.filter(is_superuser=False).count()
-    not_checked_in = max(total_users - total_checkin, 0)
+    users_checked_in_today = today_records.filter(action='checkin').values('user').distinct().count()
+    not_checked_in = max(total_users - users_checked_in_today, 0)
 
     daily_stats = (
-        Attendance.objects
-        .filter(check_in_time__isnull=False)
-        .values('date')
+        CheckInRecord.objects
+        .filter(action='checkin')
+        .values('created_at__date')
         .annotate(total=Count('id'))
-        .order_by('date')
+        .order_by('created_at__date')
     )
 
-    labels = [str(item['date']) for item in daily_stats]
+    labels = [str(item['created_at__date']) for item in daily_stats]
     values = [item['total'] for item in daily_stats]
 
     status_labels = ['มาปกติ', 'มาสาย']
     status_values = [
-        Attendance.objects.filter(status='present').count(),
-        Attendance.objects.filter(status='late').count(),
+        CheckInRecord.objects.filter(action='checkin', status='present').count(),
+        CheckInRecord.objects.filter(action='checkin', status='late').count(),
     ]
+
+    returned_users, not_returned_users = get_return_status_summary()
 
     context = {
         'data': data,
@@ -108,6 +259,8 @@ def dashboard(request):
         'values': json.dumps(values),
         'status_labels': json.dumps(status_labels),
         'status_values': json.dumps(status_values),
+        'returned_count': len(returned_users),
+        'not_returned_count': len(not_returned_users),
     }
 
     return render(request, 'dashboard.html', context)
@@ -115,100 +268,119 @@ def dashboard(request):
 
 @login_required
 def history_view(request):
-    data = Attendance.objects.filter(user=request.user).order_by('-date', '-check_in_time')
+    data = (
+        CheckInRecord.objects
+        .filter(user=request.user)
+        .select_related('user')
+        .order_by('-created_at')
+    )
     return render(request, 'history.html', {'data': data})
 
 
 @login_required
 def checkin_view(request):
-    office_lat = 13.819893421028778 
-    office_lon = 100.52994677455986
+    office_lat = 13.819810075005167
+    office_lon = 100.52961418065506
     allowed_radius = 500
     location_name = "จุดเช็คอินหลัก"
+
+    context = {
+        'office_lat': office_lat,
+        'office_lon': office_lon,
+        'allowed_radius': allowed_radius,
+        'location_name': location_name,
+        'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY,
+    }
 
     if request.method == 'POST':
         action = request.POST.get('action')
         lat = request.POST.get('latitude')
         lon = request.POST.get('longitude')
 
+        if action not in ['checkin', 'checkout']:
+            context['error'] = 'รูปแบบการทำรายการไม่ถูกต้อง'
+            return render(request, 'checkin.html', context)
+
         if not lat or not lon:
-            return render(request, 'checkin.html', {
-                'error': 'กรุณาเปิด GPS ก่อนดำเนินการ',
-                'office_lat': office_lat,
-                'office_lon': office_lon,
-                'allowed_radius': allowed_radius,
-                'location_name': location_name,
-            })
+            context['error'] = 'กรุณาเปิด GPS ก่อนดำเนินการ'
+            return render(request, 'checkin.html', context)
+
+        try:
+            lat = float(lat)
+            lon = float(lon)
+        except ValueError:
+            context['error'] = 'ข้อมูลพิกัดไม่ถูกต้อง'
+            return render(request, 'checkin.html', context)
 
         distance = calculate_distance(lat, lon, office_lat, office_lon)
 
         if distance > allowed_radius:
-            return render(request, 'checkin.html', {
-                'error': f'❌ อยู่นอกพื้นที่ ({int(distance)} เมตร)',
-                'office_lat': office_lat,
-                'office_lon': office_lon,
-                'allowed_radius': allowed_radius,
-                'location_name': location_name,
-            })
+            context['error'] = f'❌ อยู่นอกพื้นที่ ({int(distance)} เมตร)'
+            return render(request, 'checkin.html', context)
 
-        today = timezone.localdate()
         now = timezone.now()
-
-        attendance, created = Attendance.objects.get_or_create(
-            user=request.user,
-            date=today
-        )
+        today = timezone.localdate()
 
         if action == 'checkin':
-            if attendance.check_in_time:
-                return render(request, 'checkin.html', {
-                    'error': '❗ วันนี้คุณเช็คอินแล้ว',
-                    'office_lat': office_lat,
-                    'office_lon': office_lon,
-                    'allowed_radius': allowed_radius,
-                    'location_name': location_name,
-                })
+            already_checked_in = CheckInRecord.objects.filter(
+                user=request.user,
+                action='checkin',
+                created_at__date=today
+            ).exists()
 
-            attendance.check_in_time = now
-            attendance.latitude = float(lat)
-            attendance.longitude = float(lon)
-            attendance.status = calculate_status(now)
-            attendance.save()
+            if already_checked_in:
+                context['error'] = '❗ วันนี้คุณเช็คอินแล้ว'
+                return render(request, 'checkin.html', context)
+
+            record = CheckInRecord.objects.create(
+                user=request.user,
+                action='checkin',
+                latitude=lat,
+                longitude=lon,
+                distance=distance,
+                status=calculate_status(now),
+            )
+
+            notify_line_return_status(trigger_record=record)
 
             messages.success(request, '✅ เช็คอินสำเร็จ')
             return redirect('dashboard')
 
-        elif action == 'checkout':
-            if not attendance.check_in_time:
-                return render(request, 'checkin.html', {
-                    'error': '❗ กรุณาเช็คอินก่อนเช็คเอาต์',
-                    'office_lat': office_lat,
-                    'office_lon': office_lon,
-                    'allowed_radius': allowed_radius,
-                    'location_name': location_name,
-                })
+        today_checkin = CheckInRecord.objects.filter(
+            user=request.user,
+            action='checkin',
+            created_at__date=today
+        ).exists()
 
-            if attendance.check_out_time:
-                return render(request, 'checkin.html', {
-                    'error': '❗ วันนี้คุณเช็คเอาต์แล้ว',
-                    'office_lat': office_lat,
-                    'office_lon': office_lon,
-                    'allowed_radius': allowed_radius,
-                    'location_name': location_name,
-                })
+        today_checkout = CheckInRecord.objects.filter(
+            user=request.user,
+            action='checkout',
+            created_at__date=today
+        ).exists()
 
-            attendance.check_out_time = now
-            attendance.save()
+        if not today_checkin:
+            context['error'] = '❗ กรุณาเช็คอินก่อนเช็คเอาต์'
+            return render(request, 'checkin.html', context)
 
-            messages.success(request, '✅ เช็คเอาต์สำเร็จ')
-            return redirect('dashboard')
+        if today_checkout:
+            context['error'] = '❗ วันนี้คุณเช็คเอาต์แล้ว'
+            return render(request, 'checkin.html', context)
 
-    return render(request, 'checkin.html', {
-        'office_lat': office_lat,
-        'office_lon': office_lon,
-        'allowed_radius': allowed_radius,
-        'location_name': location_name,
-    })
+        record = CheckInRecord.objects.create(
+            user=request.user,
+            action='checkout',
+            latitude=lat,
+            longitude=lon,
+            distance=distance,
+            status='present',
+        )
+
+        notify_line_return_status(trigger_record=record)
+
+        messages.success(request, '✅ เช็คเอาต์สำเร็จ')
+        return redirect('dashboard')
+
+    return render(request, 'checkin.html', context)
 
 
 @login_required
@@ -219,11 +391,12 @@ def admin_dashboard(request):
 
     today = timezone.localdate()
 
-    records = Attendance.objects.select_related('user').order_by('-date', '-check_in_time')
+    records = CheckInRecord.objects.select_related('user').order_by('-created_at')
 
     q = request.GET.get('q', '').strip()
     status = request.GET.get('status', '').strip()
     date = request.GET.get('date', '').strip()
+    action = request.GET.get('action', '').strip()
 
     if q:
         records = records.filter(
@@ -235,17 +408,32 @@ def admin_dashboard(request):
     if status:
         records = records.filter(status=status)
 
+    if action:
+        records = records.filter(action=action)
+
     if date:
-        records = records.filter(date=date)
+        records = records.filter(created_at__date=date)
 
-    today_records = Attendance.objects.filter(date=today)
-    total_today = today_records.count()
-    late_today = today_records.filter(status='late').count()
-    checkout_today = today_records.filter(check_out_time__isnull=False).count()
+    today_records = CheckInRecord.objects.filter(created_at__date=today)
+    total_today = today_records.filter(action='checkin').count()
+    late_today = today_records.filter(action='checkin', status='late').count()
+    checkout_today = today_records.filter(action='checkout').count()
     total_users = User.objects.filter(is_superuser=False).count()
-    absent_today = max(total_users - total_today, 0)
+    checked_in_users_today = today_records.filter(action='checkin').values('user').distinct().count()
+    absent_today = max(total_users - checked_in_users_today, 0)
 
-    latest_record = today_records.order_by('-check_in_time').select_related('user').first()
+    latest_record = today_records.order_by('-created_at').select_related('user').first()
+
+    returned_users, not_returned_users = get_return_status_summary()
+
+    now_local = timezone.localtime()
+    deadline = now_local.replace(
+        hour=getattr(settings, 'RETURN_DEADLINE_HOUR', 18),
+        minute=getattr(settings, 'RETURN_DEADLINE_MINUTE', 0),
+        second=0,
+        microsecond=0,
+    )
+    show_return_alert = now_local > deadline and len(not_returned_users) > 0
 
     context = {
         'records': records,
@@ -257,6 +445,12 @@ def admin_dashboard(request):
         'q': q,
         'status': status,
         'date': date,
+        'action': action,
+        'returned_count': len(returned_users),
+        'not_returned_count': len(not_returned_users),
+        'not_returned_users': not_returned_users,
+        'show_return_alert': show_return_alert,
+        'return_deadline': deadline.strftime('%H:%M'),
     }
 
     return render(request, 'admin_dashboard.html', context)
@@ -271,17 +465,30 @@ def export_excel(request):
     ws = wb.active
     ws.title = "Attendance Report"
 
-    ws.append(['Username', 'Date', 'Check In', 'Check Out', 'Status'])
+    ws.append([
+        'Username',
+        'Date',
+        'Time',
+        'Action',
+        'Latitude',
+        'Longitude',
+        'Distance (m)',
+        'Status'
+    ])
 
-    records = Attendance.objects.select_related('user').all().order_by('-date', '-check_in_time')
+    records = CheckInRecord.objects.select_related('user').all().order_by('-created_at')
 
     for r in records:
+        local_dt = timezone.localtime(r.created_at)
         ws.append([
             r.user.username,
-            str(r.date),
-            str(r.check_in_time or ''),
-            str(r.check_out_time or ''),
-            r.get_status_display()
+            local_dt.strftime('%Y-%m-%d'),
+            local_dt.strftime('%H:%M:%S'),
+            r.action,
+            r.latitude,
+            r.longitude,
+            round(r.distance, 2),
+            r.status,
         ])
 
     response = HttpResponse(
