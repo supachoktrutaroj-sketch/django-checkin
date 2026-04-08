@@ -341,7 +341,8 @@ def checkin_view(request):
                 status=calculate_status(now),
             )
 
-            notify_line_return_status(trigger_record=record)
+            ok, result = notify_line_return_status(trigger_record=record)
+            print("LINE PUSH CHECKIN:", ok, result)
 
             messages.success(request, '✅ เช็คอินสำเร็จ')
             return redirect('dashboard')
@@ -375,7 +376,8 @@ def checkin_view(request):
             status='present',
         )
 
-        notify_line_return_status(trigger_record=record)
+        ok, result = notify_line_return_status(trigger_record=record)
+        print("LINE PUSH CHECKOUT:", ok, result)
 
         messages.success(request, '✅ เช็คเอาต์สำเร็จ')
         return redirect('dashboard')
