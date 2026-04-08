@@ -2,13 +2,12 @@ from pathlib import Path
 import os
 import dj_database_url
 
-# Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY
-SECRET_KEY = 'django-insecure-1234567890'
-DEBUG = True
-ALLOWED_HOSTS = ['*']
+SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-only")
+DEBUG = os.environ.get("DEBUG", "True") == "True"
+ALLOWED_HOSTS = ["*"]
 
 # Application definition
 INSTALLED_APPS = [
@@ -23,7 +22,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # 🔥 สำคัญ
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -37,7 +36,7 @@ ROOT_URLCONF = 'myproject.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],  # ถ้ามี templates กลางค่อยเพิ่มทีหลัง
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -51,13 +50,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'myproject.wsgi.application'
 
-# 🔥 Database (รองรับทั้ง SQLite และ PostgreSQL)
-DATABASES = {
-    'default': dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600
-    )
-}
+# Database
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=False)
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -73,7 +79,7 @@ TIME_ZONE = 'Asia/Bangkok'
 USE_I18N = True
 USE_TZ = True
 
-# 🔥 STATIC FILES (สำคัญมาก)
+# Static files
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
@@ -90,9 +96,14 @@ STORAGES = {
     },
 }
 
-# 🔥 สำหรับ deploy
+# Deploy
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-CSRF_TRUSTED_ORIGINS = []
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.up.railway.app",
+]
+
+# Google Maps
+GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 
 # Login settings
 LOGIN_URL = '/login/'
