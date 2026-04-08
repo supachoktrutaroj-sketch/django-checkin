@@ -170,9 +170,6 @@ def send_line_push_message(message_text):
 
 
 def notify_line_return_status(trigger_record=None):
-    """
-    กันข้อความซ้ำถี่เกินไป 1 นาทีต่อสถานะเดียวกัน
-    """
     message_text = build_line_summary_message(trigger_record=trigger_record)
     cache_key = f"line_notify:{hash(message_text)}"
 
@@ -187,7 +184,56 @@ def notify_line_return_status(trigger_record=None):
     return ok, result
 
 
+def register_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        username = request.POST.get('username', '').strip()
+        password1 = request.POST.get('password1', '')
+        password2 = request.POST.get('password2', '')
+
+        context = {
+            'first_name': first_name,
+            'last_name': last_name,
+            'username': username,
+        }
+
+        if not first_name or not last_name or not username or not password1 or not password2:
+            context['error'] = 'กรุณากรอกข้อมูลให้ครบทุกช่อง'
+            return render(request, 'register.html', context)
+
+        if User.objects.filter(username=username).exists():
+            context['error'] = 'Username นี้ถูกใช้งานแล้ว'
+            return render(request, 'register.html', context)
+
+        if password1 != password2:
+            context['error'] = 'รหัสผ่านไม่ตรงกัน'
+            return render(request, 'register.html', context)
+
+        if len(password1) < 6:
+            context['error'] = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'
+            return render(request, 'register.html', context)
+
+        User.objects.create_user(
+            username=username,
+            password=password1,
+            first_name=first_name,
+            last_name=last_name,
+        )
+
+        messages.success(request, 'สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ')
+        return redirect('login')
+
+    return render(request, 'register.html')
+
+
 def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')

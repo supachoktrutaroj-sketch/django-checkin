@@ -3,7 +3,7 @@
 {% block content %}
 
 <style>
-    .login-page {
+    .register-page {
         min-height: calc(100vh - 120px);
         display: flex;
         justify-content: center;
@@ -11,9 +11,9 @@
         padding: 30px 15px;
     }
 
-    .login-wrapper {
+    .register-wrapper {
         width: 100%;
-        max-width: 900px;
+        max-width: 980px;
         display: grid;
         grid-template-columns: 1fr 1fr;
         background: white;
@@ -22,8 +22,8 @@
         box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
     }
 
-    .login-left {
-        background: linear-gradient(135deg, #2563eb, #1d4ed8, #0f172a);
+    .register-left {
+        background: linear-gradient(135deg, #0f172a, #1d4ed8, #2563eb);
         color: white;
         padding: 45px 30px;
         display: flex;
@@ -43,12 +43,12 @@
         box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
     }
 
-    .login-left h1 {
+    .register-left h1 {
         font-size: 28px;
         margin-top: 10px;
     }
 
-    .login-left p {
+    .register-left p {
         font-size: 14px;
         margin-top: 10px;
         opacity: 0.9;
@@ -66,14 +66,14 @@
         font-size: 14px;
     }
 
-    .login-right {
+    .register-right {
         padding: 35px 25px;
         background: #f8fafc;
         display: flex;
         align-items: center;
     }
 
-    .login-form-card {
+    .register-form-card {
         background: white;
         border-radius: 18px;
         padding: 28px;
@@ -119,7 +119,7 @@
         box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
     }
 
-    .login-btn {
+    .register-btn {
         width: 100%;
         padding: 12px;
         border-radius: 12px;
@@ -131,7 +131,7 @@
         margin-top: 8px;
     }
 
-    .login-btn:hover {
+    .register-btn:hover {
         transform: translateY(-1px);
     }
 
@@ -144,52 +144,52 @@
         font-size: 13px;
     }
 
-    .register-box {
+    .link-box {
         margin-top: 16px;
         text-align: center;
         font-size: 14px;
         color: #374151;
     }
 
-    .register-box a {
+    .link-box a {
         color: #2563eb;
         font-weight: bold;
         text-decoration: none;
     }
 
-    .register-box a:hover {
+    .link-box a:hover {
         text-decoration: underline;
     }
 
     @media (max-width: 768px) {
-        .login-wrapper {
+        .register-wrapper {
             grid-template-columns: 1fr;
         }
     }
 </style>
 
-<div class="login-page">
-    <div class="login-wrapper">
+<div class="register-page">
+    <div class="register-wrapper">
 
-        <div class="login-left">
+        <div class="register-left">
             <img src="{% static 'images/logo.png' %}" class="logo" alt="logo">
 
-            <h1>ระบบเช็คชื่อ</h1>
-            <p>ระบบบันทึกเวลาเข้า-ออก ด้วย GPS</p>
+            <h1>สมัครสมาชิก</h1>
+            <p>สร้างบัญชีเพื่อใช้งานระบบเช็คชื่อ</p>
 
             <ul class="feature-list">
-                <li>✅ เช็คอินด้วยตำแหน่งจริง</li>
-                <li>✅ บันทึกเวลาอัตโนมัติ</li>
-                <li>✅ ดูประวัติย้อนหลังได้</li>
-                <li>✅ มีระบบผู้ดูแล</li>
+                <li>✅ สมัครใช้งานได้ด้วยตนเอง</li>
+                <li>✅ เช็คอินและเช็คเอาต์ผ่านระบบ</li>
+                <li>✅ ตรวจสอบประวัติย้อนหลังได้</li>
+                <li>✅ รองรับการแจ้งเตือนผ่าน LINE</li>
             </ul>
         </div>
 
-        <div class="login-right">
-            <div class="login-form-card">
+        <div class="register-right">
+            <div class="register-form-card">
 
-                <div class="form-title">เข้าสู่ระบบ</div>
-                <div class="form-subtitle">กรอกข้อมูลเพื่อเข้าใช้งาน</div>
+                <div class="form-title">สร้างบัญชีใหม่</div>
+                <div class="form-subtitle">กรอกข้อมูลให้ครบเพื่อสมัครสมาชิก</div>
 
                 {% if error %}
                 <div class="error-box">
@@ -197,35 +197,42 @@
                 </div>
                 {% endif %}
 
-                {% if messages %}
-                {% for message in messages %}
-                <div class="error-box" style="background:#dcfce7; color:#166534;">
-                    {{ message }}
-                </div>
-                {% endfor %}
-                {% endif %}
-
                 <form method="POST">
                     {% csrf_token %}
 
                     <div class="form-group">
+                        <label>ชื่อ</label>
+                        <input type="text" name="first_name" value="{{ first_name|default:'' }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>นามสกุล</label>
+                        <input type="text" name="last_name" value="{{ last_name|default:'' }}" required>
+                    </div>
+
+                    <div class="form-group">
                         <label>ชื่อผู้ใช้</label>
-                        <input type="text" name="username" required>
+                        <input type="text" name="username" value="{{ username|default:'' }}" required>
                     </div>
 
                     <div class="form-group">
                         <label>รหัสผ่าน</label>
-                        <input type="password" name="password" required>
+                        <input type="password" name="password1" required>
                     </div>
 
-                    <button type="submit" class="login-btn">
-                        🔐 เข้าสู่ระบบ
+                    <div class="form-group">
+                        <label>ยืนยันรหัสผ่าน</label>
+                        <input type="password" name="password2" required>
+                    </div>
+
+                    <button type="submit" class="register-btn">
+                        📝 สมัครสมาชิก
                     </button>
                 </form>
 
-                <div class="register-box">
-                    ยังไม่มีบัญชี?
-                    <a href="{% url 'register' %}">สมัครสมาชิก</a>
+                <div class="link-box">
+                    มีบัญชีแล้ว?
+                    <a href="{% url 'login' %}">เข้าสู่ระบบ</a>
                 </div>
 
             </div>
