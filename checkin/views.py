@@ -85,21 +85,6 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return r * c
 
 
-def calculate_face_distance(desc1, desc2):
-    total = 0
-    for a, b in zip(desc1, desc2):
-        total += (float(a) - float(b)) ** 2
-    return math.sqrt(total)
-
-
-def is_valid_face_descriptor(descriptor):
-    return (
-        isinstance(descriptor, list)
-        and len(descriptor) == 128
-        and all(isinstance(x, (int, float)) for x in descriptor)
-    )
-
-
 def calculate_status(checkin_datetime):
     setting = get_system_setting()
     local_time = timezone.localtime(checkin_datetime).time()
@@ -441,6 +426,7 @@ def save_face_descriptor(request):
         if not is_valid_face_descriptor(descriptor):
             return JsonResponse({
                 'success': False,
+                'message': 'ข้อมูลใบหน้าไม่ถูกต้อง กรุณาสแกนใหม่อีกครั้ง',
                 'error': 'ข้อมูลใบหน้าไม่ถูกต้อง กรุณาสแกนใหม่อีกครั้ง'
             }, status=400)
 
@@ -450,7 +436,8 @@ def save_face_descriptor(request):
         if profile.face_descriptor:
             return JsonResponse({
                 'success': False,
-                'error': 'บัญชีนี้ลงทะเบียนใบหน้าไว้แล้ว ไม่สามารถลงซ้ำได้'
+                'message': 'บัญชีนี้ลงทะเบียนใบหน้าไว้แล้ว ไม่สามารถลงทะเบียนซ้ำได้',
+                'error': 'บัญชีนี้ลงทะเบียนใบหน้าไว้แล้ว ไม่สามารถลงทะเบียนซ้ำได้'
             }, status=400)
 
         # ป้องกันไม่ให้ใบหน้าเดียวกันไปลงทะเบียนกับบัญชีอื่น
@@ -475,6 +462,7 @@ def save_face_descriptor(request):
                 if distance < duplicate_threshold:
                     return JsonResponse({
                         'success': False,
+                        'message': 'ใบหน้านี้ถูกลงทะเบียนกับบัญชีอื่นแล้ว ไม่สามารถใช้ซ้ำได้',
                         'error': 'ใบหน้านี้ถูกลงทะเบียนกับบัญชีอื่นแล้ว ไม่สามารถใช้ซ้ำได้'
                     }, status=400)
 
@@ -491,7 +479,11 @@ def save_face_descriptor(request):
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+        return JsonResponse({
+            'success': False,
+            'message': str(e),
+            'error': str(e)
+        }, status=400)
 
 
 @login_required
@@ -508,8 +500,8 @@ def face_verify_page(request):
 
 @login_required
 def checkin_view(request):
-    office_lat = 13.819810075005167
-    office_lon = 100.52961418065506
+    office_lat = 13.878779447272407
+    office_lon = 100.5912086091356
     allowed_radius = 500
     location_name = "จุดเช็คอินหลัก"
 
