@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<style>
+    .profile-card {
+        background: white;
+        padding: 25px;
+        border-radius: 16px;
+        max-width: 500px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    }
+
+    .profile-title {
+        font-size: 22px;
+        font-weight: bold;
+        margin-bottom: 20px;
+    }
+
+    .profile-item {
+        margin-bottom: 15px;
+        font-size: 16px;
+    }
+
+    .profile-label {
+        font-weight: bold;
+        color: #374151;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: bold;
+    }
+
+    .badge-green {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .badge-red {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+</style>
+
+<div class="profile-card">
+    <div class="profile-title">👤 ข้อมูลส่วนตัว</div>
+
+    <div class="profile-item">
+        <span class="profile-label">ชื่อผู้ใช้:</span>
+        {{ user.username }}
+    </div>
+
+    <div class="profile-item">
+        <span class="profile-label">อีเมล:</span>
+        {{ user.email|default:"-" }}
+    </div>
+
+    <div class="profile-item">
+        <span class="profile-label">เบอร์โทร:</span>
+        {{ profile.phone_number|default:"-" }}
+    </div>
+
+    <div class="profile-item">
+        <span class="profile-label">วันที่สมัคร:</span>
+        {{ user.date_joined|date:"d/m/Y H:i" }}
+    </div>
+
+    <hr style="margin:20px 0;">
+
+    <div class="profile-title">📍 การทำรายการล่าสุด</div>
+
+    {% if latest_record %}
+    <div class="profile-item">
+        <span class="profile-label">วันที่:</span>
+        {{ latest_record.created_at|date:"d/m/Y" }}
+    </div>
+
+    <div class="profile-item">
+        <span class="profile-label">เวลา:</span>
+        {{ latest_record.created_at|time:"H:i:s" }}
+    </div>
+
+    <div class="profile-item">
+        <span class="profile-label">ประเภท:</span>
+        {% if latest_record.action == 'checkin' %}
+        <span class="badge badge-green">เข้างาน</span>
+        {% else %}
+        <span class="badge badge-red">ออกงาน</span>
+        {% endif %}
+    </div>
+
+    <div class="profile-item">
+        <span class="profile-label">พิกัด:</span>
+        {{ latest_record.latitude }}, {{ latest_record.longitude }}
+    </div>
+
+    {% else %}
+    <p>ยังไม่มีข้อมูล</p>
+    {% endif %}
+</div>
+
+{% endblock %}

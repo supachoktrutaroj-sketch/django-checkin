@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 
@@ -78,18 +79,8 @@
         background: linear-gradient(135deg, #22c55e, #15803d);
     }
 
-    .btn-checkin:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 18px rgba(34, 197, 94, 0.28);
-    }
-
     .btn-checkout {
         background: linear-gradient(135deg, #ef4444, #b91c1c);
-    }
-
-    .btn-checkout:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 18px rgba(239, 68, 68, 0.28);
     }
 
     .action-btn:disabled {
@@ -103,6 +94,9 @@
         color: #c62828;
         font-weight: bold;
         margin-top: 10px;
+        background: #fee2e2;
+        padding: 12px;
+        border-radius: 10px;
     }
 
     .map-title {
@@ -118,6 +112,92 @@
         width: 100%;
         border-radius: 14px;
         overflow: hidden;
+    }
+
+    .face-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+        padding: 16px;
+    }
+
+    .face-modal-content {
+        width: 100%;
+        max-width: 520px;
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .face-modal-title {
+        font-size: 22px;
+        font-weight: bold;
+        margin-bottom: 12px;
+        color: #1f2937;
+    }
+
+    .face-video {
+        width: 100%;
+        border-radius: 14px;
+        background: #111827;
+        margin-bottom: 14px;
+    }
+
+    .face-status {
+        padding: 12px 14px;
+        border-radius: 10px;
+        font-weight: bold;
+        background: #eff6ff;
+        color: #1e3a8a;
+        margin-bottom: 12px;
+        line-height: 1.6;
+    }
+
+    .face-status.success {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .face-status.error {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .face-status.warning {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .face-btn-group {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .face-btn {
+        border: none;
+        padding: 12px 16px;
+        border-radius: 10px;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .face-btn-blue {
+        background: #2563eb;
+    }
+
+    .face-btn-green {
+        background: #16a34a;
+    }
+
+    .face-btn-gray {
+        background: #6b7280;
     }
 
     @media (max-width: 768px) {
@@ -145,20 +225,21 @@
     <h3 class="location-title">{{ location_name }}</h3>
 
     {% if error %}
-    <p class="error-text">{{ error }}</p>
+    <p class="error-text" id="pageError">{{ error }}</p>
     {% endif %}
 
-    <form method="POST">
+    <form method="POST" id="checkinForm">
         {% csrf_token %}
         <input type="hidden" name="latitude" id="lat">
         <input type="hidden" name="longitude" id="lon">
+        <input type="hidden" name="action" id="actionInput">
 
         <div class="btn-group">
-            <button class="action-btn btn-checkin" type="submit" name="action" value="checkin" id="checkinBtn">
+            <button class="action-btn btn-checkin" type="button" id="checkinBtn" onclick="startFaceFlow('checkin')">
                 ✅ เช็คอิน
             </button>
 
-            <button class="action-btn btn-checkout" type="submit" name="action" value="checkout" id="checkoutBtn">
+            <button class="action-btn btn-checkout" type="button" id="checkoutBtn" onclick="startFaceFlow('checkout')">
                 🔴 เช็คเอาต์
             </button>
         </div>
@@ -178,6 +259,24 @@
     <div id="map"></div>
 </div>
 
+<div class="face-modal" id="faceModal">
+    <div class="face-modal-content">
+        <div class="face-modal-title">🧠 สแกนใบหน้าก่อนดำเนินการ</div>
+
+        <video id="faceVideo" class="face-video" autoplay muted playsinline></video>
+
+        <div id="faceStatus" class="face-status">รอเริ่มต้น...</div>
+
+        <div class="face-btn-group">
+            <button class="face-btn face-btn-blue" type="button" onclick="openFaceCamera()">เปิดกล้อง</button>
+            <button class="face-btn face-btn-green" type="button" onclick="verifyFaceAndSubmit()">สแกนใบหน้า</button>
+            <button class="face-btn face-btn-gray" type="button" onclick="closeFaceModal()">ยกเลิก</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
 <script>
     let map;
     let marker;
@@ -186,6 +285,21 @@
     const officeLat = parseFloat("{{ office_lat|default:'0' }}");
     const officeLon = parseFloat("{{ office_lon|default:'0' }}");
     const allowedRadius = parseFloat("{{ allowed_radius|default:'100' }}");
+
+    const savedDescriptor = JSON.parse('{{ saved_descriptor|escapejs }}');
+    const MODEL_URL = "{% static 'models' %}";
+
+    let gpsAllowed = false;
+    let faceModelsLoaded = false;
+    let faceCameraStarted = false;
+    let pendingAction = null;
+    let faceStream = null;
+    let submitStarted = false;
+    let firstFaceSize = null;
+
+    const faceModal = document.getElementById("faceModal");
+    const faceVideo = document.getElementById("faceVideo");
+    const faceStatus = document.getElementById("faceStatus");
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
         const R = 6371000;
@@ -212,6 +326,29 @@
     function setButtonsEnabled(enabled) {
         document.getElementById("checkinBtn").disabled = !enabled;
         document.getElementById("checkoutBtn").disabled = !enabled;
+    }
+
+    function setFaceStatus(message, type = "normal") {
+        faceStatus.textContent = message;
+        faceStatus.className = "face-status";
+
+        if (type === "success") faceStatus.classList.add("success");
+        if (type === "error") faceStatus.classList.add("error");
+        if (type === "warning") faceStatus.classList.add("warning");
+    }
+
+    async function loadFaceModels() {
+        try {
+            setFaceStatus("กำลังโหลดระบบจดจำใบหน้า...");
+            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            faceModelsLoaded = true;
+            setFaceStatus("✅ โหลดระบบจดจำใบหน้าสำเร็จ", "success");
+        } catch (err) {
+            setFaceStatus("❌ โหลดระบบจดจำใบหน้าไม่สำเร็จ", "error");
+            console.error(err);
+        }
     }
 
     function initMap() {
@@ -263,28 +400,181 @@
                     document.getElementById("distanceText").innerText = Math.round(distance) + " เมตร";
 
                     if (distance <= allowedRadius) {
-                        setStatus(true, "✅ อยู่ในพื้นที่ที่กำหนด สามารถเช็คอินและเช็คเอาต์ได้");
+                        gpsAllowed = true;
+                        setStatus(true, "✅ อยู่ในพื้นที่ที่กำหนด สามารถดำเนินการได้");
                         setButtonsEnabled(true);
                     } else {
+                        gpsAllowed = false;
                         setStatus(false, "❌ อยู่นอกพื้นที่ที่กำหนด ยังไม่สามารถดำเนินการได้");
                         setButtonsEnabled(false);
                     }
                 },
                 function () {
+                    gpsAllowed = false;
                     setStatus(false, "❌ ไม่สามารถดึง GPS ได้ กรุณาอนุญาต location");
                     document.getElementById("distanceText").innerText = "-";
                     setButtonsEnabled(false);
                 }
             );
         } else {
+            gpsAllowed = false;
             setStatus(false, "❌ เบราว์เซอร์นี้ไม่รองรับ GPS");
             document.getElementById("distanceText").innerText = "-";
             setButtonsEnabled(false);
         }
     }
+
+    function startFaceFlow(action) {
+        if (!gpsAllowed) {
+            alert("ยังไม่สามารถดำเนินการได้ เพราะ GPS ไม่พร้อมหรืออยู่นอกพื้นที่");
+            return;
+        }
+
+        pendingAction = action;
+        submitStarted = false;
+        firstFaceSize = null;
+        faceModal.style.display = "flex";
+
+        if (!faceModelsLoaded) {
+            setFaceStatus("⚠️ ระบบจดจำใบหน้ายังไม่พร้อม กรุณารอสักครู่", "warning");
+        } else {
+            setFaceStatus("กรุณาเปิดกล้อง แล้วกดสแกนใบหน้า", "warning");
+        }
+    }
+
+    async function openFaceCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "user" },
+                audio: false
+            });
+
+            faceVideo.srcObject = stream;
+            faceStream = stream;
+            faceCameraStarted = true;
+            submitStarted = false;
+            firstFaceSize = null;
+
+            setFaceStatus("✅ กล้องพร้อมใช้งาน กรุณากดสแกนใบหน้า", "success");
+        } catch (err) {
+            setFaceStatus("❌ เปิดกล้องไม่สำเร็จ: " + err.message, "error");
+        }
+    }
+
+    function closeFaceModal() {
+        faceModal.style.display = "none";
+        pendingAction = null;
+        submitStarted = false;
+        firstFaceSize = null;
+
+        if (faceStream) {
+            faceStream.getTracks().forEach(track => track.stop());
+            faceStream = null;
+        }
+
+        faceVideo.srcObject = null;
+        faceCameraStarted = false;
+    }
+
+    async function verifyFaceAndSubmit() {
+        try {
+            if (submitStarted) return;
+
+            if (!faceModelsLoaded) {
+                setFaceStatus("⚠️ ระบบจดจำใบหน้ายังโหลดไม่เสร็จ", "warning");
+                return;
+            }
+
+            if (!faceCameraStarted || !faceVideo.srcObject) {
+                setFaceStatus("⚠️ กรุณากดเปิดกล้องก่อน", "warning");
+                return;
+            }
+
+            if (!savedDescriptor || savedDescriptor.length === 0) {
+                setFaceStatus("❌ ไม่พบข้อมูลใบหน้าที่ลงทะเบียนไว้", "error");
+                return;
+            }
+
+            setFaceStatus("👉 กรุณาเอาหน้าเข้าใกล้กล้อง", "warning");
+
+            const firstDetection = await faceapi
+                .detectSingleFace(faceVideo, new faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            if (!firstDetection) {
+                setFaceStatus("❌ ไม่พบใบหน้า กรุณาหันหน้าเข้ากล้องให้ชัด", "error");
+                return;
+            }
+
+            firstFaceSize = firstDetection.detection.box.width;
+
+            if (firstFaceSize < 130) {
+                setFaceStatus("👉 กรุณาเอาหน้าเข้าใกล้กล้องอีกนิด", "warning");
+                return;
+            }
+
+            setFaceStatus("👉 ตอนนี้ถอยหน้าออกจากกล้อง ภายใน 3 วินาที", "warning");
+
+            await new Promise(resolve => setTimeout(resolve, 3500));
+
+            const secondDetection = await faceapi
+                .detectSingleFace(faceVideo, new faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            if (!secondDetection) {
+                setFaceStatus("❌ ไม่พบใบหน้าหลังถอยออก กรุณาลองใหม่", "error");
+                return;
+            }
+
+            const secondFaceSize = secondDetection.detection.box.width;
+
+            if (secondFaceSize > firstFaceSize * 0.88) {
+                setFaceStatus("❌ กรุณาถอยหน้าออกให้ชัดเจน แล้วกดสแกนใหม่", "error");
+                return;
+            }
+
+            setFaceStatus("กำลังตรวจสอบใบหน้า...", "warning");
+
+            const labeledDescriptor = new faceapi.LabeledFaceDescriptors(
+                "owner",
+                [new Float32Array(savedDescriptor)]
+            );
+
+            const faceMatcher = new faceapi.FaceMatcher([labeledDescriptor], 0.5);
+            const bestMatch = faceMatcher.findBestMatch(secondDetection.descriptor);
+
+            if (bestMatch.label === "owner") {
+                submitStarted = true;
+                setFaceStatus("✅ ผ่านการตรวจจับคนจริง และยืนยันใบหน้าสำเร็จ", "success");
+
+                document.getElementById("actionInput").value = pendingAction;
+
+                setTimeout(() => {
+                    document.getElementById("checkinForm").submit();
+                }, 500);
+            } else {
+                setFaceStatus("❌ ใบหน้าไม่ตรงกับบัญชีนี้", "error");
+            }
+
+        } catch (err) {
+            setFaceStatus("❌ เกิดข้อผิดพลาด: " + err.message, "error");
+            console.error(err);
+        }
+    }
+
+    window.onload = function () {
+        loadFaceModels();
+
+        const pageError = document.getElementById("pageError");
+        if (pageError) {
+            alert(pageError.innerText);
+        }
+    };
 </script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAdEA5DMsDjS26MJotjMxeXkDRxbZZo_dY&callback=initMap" async
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap" async
     defer></script>
 
 {% endblock %}

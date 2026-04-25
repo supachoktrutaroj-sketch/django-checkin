@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .page-wrap {
+        max-width: 700px;
+        margin: 30px auto;
+    }
+
+    .card {
+        background: white;
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+    }
+
+    .title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 8px;
+    }
+
+    .subtitle {
+        color: #6b7280;
+        margin-bottom: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 16px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 6px;
+    }
+
+    .form-group input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+    }
+
+    .btn-row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+    }
+
+    .btn {
+        padding: 12px 16px;
+        border-radius: 10px;
+        text-decoration: none;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-primary {
+        background: #2563eb;
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #e5e7eb;
+        color: #111827;
+    }
+
+    .alert {
+        padding: 12px;
+        border-radius: 10px;
+        margin-bottom: 16px;
+        font-weight: bold;
+    }
+
+    .alert-success {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .alert-error {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+</style>
+
+<div class="page-wrap">
+    <div class="card">
+        <div class="title">⏰ ตั้งค่าเวลาเข้ากรม</div>
+        <div class="subtitle">แอดมินสามารถตั้งเวลาเริ่มงาน เวลามาสาย และเวลากลับได้จากหน้านี้</div>
+
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <form method="POST">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label>เวลาเริ่มเข้างาน</label>
+                <input type="time" name="checkin_start_time" value="{{ setting.checkin_start_time|time:'H:i' }}"
+                    required>
+            </div>
+
+            <div class="form-group">
+                <label>เวลาที่ถือว่ามาสาย</label>
+                <input type="time" name="late_time" value="{{ setting.late_time|time:'H:i' }}" required>
+            </div>
+
+            <div class="form-group">
+                <label>เวลากลับเข้ากรม/เวลาแจ้งเตือน</label>
+                <input type="time" name="return_deadline" value="{{ setting.return_deadline|time:'H:i' }}" required>
+            </div>
+
+            <div class="btn-row">
+                <button type="submit" class="btn btn-primary">💾 บันทึกเวลา</button>
+                <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary">← กลับไปหน้า Admin Dashboard</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    .face-card {
+        background: white;
+        padding: 24px;
+        border-radius: 16px;
+        max-width: 760px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    }
+
+    .face-title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 16px;
+    }
+
+    video {
+        width: 100%;
+        max-width: 420px;
+        border-radius: 14px;
+        background: #111827;
+    }
+
+    .btn {
+        border: none;
+        padding: 12px 18px;
+        border-radius: 10px;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .btn-blue {
+        background: #2563eb;
+    }
+
+    .btn-green {
+        background: #16a34a;
+    }
+
+    .status-box {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 10px;
+        font-weight: bold;
+    }
+
+    .status-success {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-error {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .status-warning {
+        background: #fef3c7;
+        color: #92400e;
+    }
+</style>
+
+<div class="face-card">
+    <div class="face-title">📸 ลงทะเบียนใบหน้า</div>
+
+    <video id="video" autoplay muted playsinline></video>
+
+    <div style="margin-top:10px;">
+        <button class="btn btn-blue" onclick="startCamera()">เปิดกล้อง</button>
+        <button class="btn btn-green" onclick="registerFace()">บันทึกใบหน้า</button>
+    </div>
+
+    <div id="status" class="status-box">รอโหลด...</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+
+<script>
+    const video = document.getElementById('video');
+    const statusBox = document.getElementById('status');
+    const MODEL_URL = "{% static 'models' %}";
+
+    let step = 1;
+    let modelsLoaded = false;
+
+    function setStatus(msg, type = 'normal') {
+        statusBox.textContent = msg;
+        statusBox.className = 'status-box';
+        if (type === 'success') statusBox.classList.add('status-success');
+        if (type === 'error') statusBox.classList.add('status-error');
+        if (type === 'warning') statusBox.classList.add('status-warning');
+    }
+
+    async function loadModels() {
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+        modelsLoaded = true;
+        setStatus("👉 กรุณากะพริบตา", "warning");
+    }
+
+    window.onload = loadModels;
+
+    async function startCamera() {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        detectLoop();
+    }
+
+    function eyeRatio(eye) {
+        const v1 = Math.abs(eye[1].y - eye[5].y);
+        const v2 = Math.abs(eye[2].y - eye[4].y);
+        const h = Math.abs(eye[0].x - eye[3].x);
+        return (v1 + v2) / (2 * h);
+    }
+
+    function getDirection(landmarks) {
+        const nose = landmarks.getNose()[3];
+        const jaw = landmarks.getJawOutline();
+        const center = (jaw[0].x + jaw[16].x) / 2;
+
+        if (nose.x < center - 10) return "left";
+        if (nose.x > center + 10) return "right";
+        return "center";
+    }
+
+    async function detectLoop() {
+        if (!modelsLoaded) return;
+
+        const res = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks();
+
+        if (res) {
+            const left = res.landmarks.getLeftEye();
+            const right = res.landmarks.getRightEye();
+            const ratio = (eyeRatio(left) + eyeRatio(right)) / 2;
+
+            const dir = getDirection(res.landmarks);
+
+            // STEP 1
+            if (step === 1 && ratio < 0.22) {
+                step = 2;
+                setStatus("✅ กะพริบแล้ว → หันซ้าย", "success");
+            }
+
+            // STEP 2
+            else if (step === 2 && dir === "left") {
+                step = 3;
+                setStatus("✅ หันซ้ายแล้ว → หันขวา", "success");
+            }
+
+            // STEP 3
+            else if (step === 3 && dir === "right") {
+                step = 4;
+                setStatus("🎉 ยืนยันสำเร็จ กดบันทึกได้", "success");
+            }
+        }
+
+        requestAnimationFrame(detectLoop);
+    }
+
+    function getCookie(name) {
+        let v = null;
+        document.cookie.split(';').forEach(c => {
+            c = c.trim();
+            if (c.startsWith(name + '=')) v = decodeURIComponent(c.substring(name.length + 1));
+        });
+        return v;
+    }
+
+    async function registerFace() {
+
+        if (step !== 4) {
+            return setStatus("❌ กรุณาทำให้ครบ 3 ขั้นตอน", "error");
+        }
+
+        const result = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+
+        if (!result) {
+            return setStatus("❌ ไม่พบใบหน้า", "error");
+        }
+
+        const res = await fetch("{% url 'save_face_descriptor' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                descriptor: Array.from(result.descriptor)
+            })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            setStatus("✅ บันทึกสำเร็จ", "success");
+        } else {
+            setStatus("❌ " + data.message, "error");
+        }
+    }
+</script>
+
+{% endblock %}

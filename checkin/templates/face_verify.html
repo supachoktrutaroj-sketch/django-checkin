@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    .face-card {
+        background: white;
+        padding: 24px;
+        border-radius: 16px;
+        max-width: 760px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    }
+
+    .face-title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 16px;
+    }
+
+    .camera-box {
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        align-items: flex-start;
+    }
+
+    video {
+        width: 100%;
+        max-width: 420px;
+        border-radius: 14px;
+        background: #111827;
+    }
+
+    .btn {
+        border: none;
+        padding: 12px 18px;
+        border-radius: 10px;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .btn-blue {
+        background: #2563eb;
+    }
+
+    .btn-green {
+        background: #16a34a;
+    }
+
+    .status-box {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 10px;
+        background: #eff6ff;
+        color: #1e3a8a;
+        font-weight: bold;
+    }
+
+    .success-box {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .error-box {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+</style>
+
+<div class="face-card">
+    <div class="face-title">🧠 ตรวจสอบใบหน้า</div>
+
+    {% if not has_face_registered %}
+    <div class="status-box error-box">
+        ยังไม่ได้ลงทะเบียนใบหน้า กรุณาไปที่เมนู “ลงทะเบียนใบหน้า” ก่อน
+    </div>
+    {% else %}
+    <div class="camera-box">
+        <video id="video" autoplay muted playsinline></video>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-blue" type="button" onclick="startCamera()">เปิดกล้อง</button>
+            <button class="btn btn-green" type="button" onclick="verifyFace()">ตรวจสอบใบหน้า</button>
+        </div>
+
+        <div id="status" class="status-box">รอเปิดกล้อง...</div>
+        <div id="next-step" style="display:none;">
+            <a href="{% url 'checkin' %}" class="btn btn-green" style="text-decoration:none; display:inline-block;">
+                ไปหน้าเช็คอิน
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% if has_face_registered %}
+<script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script>
+    const video = document.getElementById('video');
+    const statusBox = document.getElementById('status');
+    const nextStep = document.getElementById('next-step');
+
+    const savedDescriptor = JSON.parse('{{ saved_descriptor|escapejs }}');
+
+    async function loadModels() {
+        statusBox.textContent = 'กำลังโหลดโมเดลใบหน้า...';
+        await faceapi.nets.tinyFaceDetector.loadFromUri('/static/models');
+        await faceapi.nets.faceLandmark68Net.loadFromUri('/static/models');
+        await faceapi.nets.faceRecognitionNet.loadFromUri('/static/models');
+        statusBox.textContent = 'โหลดโมเดลสำเร็จ';
+    }
+
+    async function startCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user' },
+                audio: false
+            });
+            video.srcObject = stream;
+            statusBox.className = 'status-box';
+            statusBox.textContent = 'เปิดกล้องแล้ว กรุณาหันหน้าเข้ากล้อง';
+        } catch (err) {
+            statusBox.className = 'status-box error-box';
+            statusBox.textContent = 'เปิดกล้องไม่สำเร็จ: ' + err.message;
+        }
+    }
+
+    async function verifyFace() {
+        try {
+            statusBox.className = 'status-box';
+            statusBox.textContent = 'กำลังตรวจสอบใบหน้า...';
+
+            const detection = await faceapi
+                .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            if (!detection) {
+                statusBox.className = 'status-box error-box';
+                statusBox.textContent = 'ไม่พบใบหน้า กรุณาหันหน้าเข้ากล้องให้ชัด';
+                nextStep.style.display = 'none';
+                return;
+            }
+
+            const currentDescriptor = detection.descriptor;
+            const labeledDescriptor = new faceapi.LabeledFaceDescriptors(
+                'owner',
+                [new Float32Array(savedDescriptor)]
+            );
+
+            const faceMatcher = new faceapi.FaceMatcher([labeledDescriptor], 0.5);
+            const bestMatch = faceMatcher.findBestMatch(currentDescriptor);
+
+            if (bestMatch.label === 'owner') {
+                statusBox.className = 'status-box success-box';
+                statusBox.textContent = '✅ ยืนยันใบหน้าสำเร็จ สามารถไปเช็คอินได้';
+                nextStep.style.display = 'block';
+            } else {
+                statusBox.className = 'status-box error-box';
+                statusBox.textContent = '❌ ใบหน้าไม่ตรงกับบัญชีนี้';
+                nextStep.style.display = 'none';
+            }
+        } catch (err) {
+            statusBox.className = 'status-box error-box';
+            statusBox.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+            nextStep.style.display = 'none';
+        }
+    }
+
+    loadModels();
+</script>
+{% endif %}
+{% endblock %}
