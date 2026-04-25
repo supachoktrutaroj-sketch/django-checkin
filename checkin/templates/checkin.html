@@ -269,7 +269,7 @@
 
         <div class="face-btn-group">
             <button class="face-btn face-btn-blue" type="button" onclick="openFaceCamera()">เปิดกล้อง</button>
-            <button class="face-btn face-btn-green" type="button" onclick="verifyFaceAndSubmit()">สแกนใบหน้า</button>
+            <button class="face-btn face-btn-green" type="button" onclick="verifyFaceAndSubmit()">เริ่มสแกน</button>
             <button class="face-btn face-btn-gray" type="button" onclick="closeFaceModal()">ยกเลิก</button>
         </div>
     </div>
@@ -295,8 +295,12 @@
     let pendingAction = null;
     let faceStream = null;
     let submitStarted = false;
-    let firstFaceSize = null;
 
+    let baseFaceSize = null;
+    let maxEyeRatio = 0;
+    let eyeWasClosed = false;
+
+    const CHALLENGE_SECONDS = 5;
     const faceModal = document.getElementById("faceModal");
     const faceVideo = document.getElementById("faceVideo");
     const faceStatus = document.getElementById("faceStatus");
@@ -432,13 +436,15 @@
 
         pendingAction = action;
         submitStarted = false;
-        firstFaceSize = null;
+        baseFaceSize = null;
+        maxEyeRatio = 0;
+        eyeWasClosed = false;
         faceModal.style.display = "flex";
 
         if (!faceModelsLoaded) {
             setFaceStatus("⚠️ ระบบจดจำใบหน้ายังไม่พร้อม กรุณารอสักครู่", "warning");
         } else {
-            setFaceStatus("กรุณาเปิดกล้อง แล้วกดสแกนใบหน้า", "warning");
+            setFaceStatus("กรุณาเปิดกล้อง แล้วกดเริ่มสแกน", "warning");
         }
     }
 
@@ -453,9 +459,8 @@
             faceStream = stream;
             faceCameraStarted = true;
             submitStarted = false;
-            firstFaceSize = null;
 
-            setFaceStatus("✅ กล้องพร้อมใช้งาน กรุณากดสแกนใบหน้า", "success");
+            setFaceStatus("✅ กล้องพร้อมใช้งาน กรุณากดเริ่มสแกน", "success");
         } catch (err) {
             setFaceStatus("❌ เปิดกล้องไม่สำเร็จ: " + err.message, "error");
         }
@@ -465,7 +470,9 @@
         faceModal.style.display = "none";
         pendingAction = null;
         submitStarted = false;
-        firstFaceSize = null;
+        baseFaceSize = null;
+        maxEyeRatio = 0;
+        eyeWasClosed = false;
 
         if (faceStream) {
             faceStream.getTracks().forEach(track => track.stop());
@@ -474,6 +481,167 @@
 
         faceVideo.srcObject = null;
         faceCameraStarted = false;
+    }
+
+    function distancePoint(a, b) {
+        return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    function eyeRatio(eye) {
+        const A = distancePoint(eye[1], eye[5]);
+        const B = distancePoint(eye[2], eye[4]);
+        const C = distancePoint(eye[0], eye[3]);
+
+        if (C === 0) return 1;
+        return (A + B) / (2.0 * C);
+    }
+
+    function isBlinkPassed(landmarks) {
+        const left = landmarks.getLeftEye();
+        const right = landmarks.getRightEye();
+        const ratio = (eyeRatio(left) + eyeRatio(right)) / 2;
+
+        if (ratio > maxEyeRatio) {
+            maxEyeRatio = ratio;
+        }
+
+        if (maxEyeRatio <= 0) return false;
+
+        const closedLevel = maxEyeRatio * 0.72;
+        const openLevel = maxEyeRatio * 0.90;
+
+        if (ratio < closedLevel) {
+            eyeWasClosed = true;
+        }
+
+        if (eyeWasClosed && ratio > openLevel) {
+            eyeWasClosed = false;
+            return true;
+        }
+
+        return false;
+    }
+
+    function isNearPassed(detection) {
+        const size = detection.detection.box.width;
+
+        if (!baseFaceSize) {
+            baseFaceSize = size;
+            return false;
+        }
+
+        return size > baseFaceSize * 1.18;
+    }
+
+    function isFarPassed(detection) {
+        const size = detection.detection.box.width;
+
+        if (!baseFaceSize) {
+            baseFaceSize = size;
+            return false;
+        }
+
+        return size < baseFaceSize * 0.82;
+    }
+
+    function getRandomChallenges() {
+        const list = [
+            {
+                key: "blink",
+                text: "กะพริบตา 1 ครั้ง",
+            },
+            {
+                key: "near",
+                text: "เอาหน้าเข้าใกล้กล้อง",
+            },
+            {
+                key: "far",
+                text: "ถอยหน้าออกจากกล้อง",
+            }
+        ];
+
+        list.sort(() => Math.random() - 0.5);
+        return list.slice(0, 2);
+    }
+
+    function wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function detectFace() {
+        return await faceapi
+            .detectSingleFace(faceVideo, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+    }
+
+    async function runOneChallenge(challenge, index, total) {
+        baseFaceSize = null;
+        maxEyeRatio = 0;
+        eyeWasClosed = false;
+
+        const startedAt = Date.now();
+        const deadline = startedAt + (CHALLENGE_SECONDS * 1000);
+
+        while (Date.now() < deadline) {
+            const remain = Math.ceil((deadline - Date.now()) / 1000);
+
+            setFaceStatus(
+                `ขั้นที่ ${index + 1}/${total}: ${challenge.text} ภายใน ${remain} วินาที`,
+                "warning"
+            );
+
+            const detection = await detectFace();
+
+            if (!detection) {
+                setFaceStatus("❌ ไม่พบใบหน้า กรุณาหันหน้าเข้ากล้อง", "error");
+                await wait(500);
+                continue;
+            }
+
+            let passed = false;
+
+            if (challenge.key === "blink") {
+                passed = isBlinkPassed(detection.landmarks);
+            } else if (challenge.key === "near") {
+                passed = isNearPassed(detection);
+            } else if (challenge.key === "far") {
+                passed = isFarPassed(detection);
+            }
+
+            if (passed) {
+                setFaceStatus(`✅ ผ่านขั้นที่ ${index + 1}: ${challenge.text}`, "success");
+                await wait(900);
+                return detection;
+            }
+
+            await wait(250);
+        }
+
+        throw new Error(`หมดเวลาในขั้นตอน: ${challenge.text}`);
+    }
+
+    async function verifyDetectedFace(detection) {
+        const labeledDescriptor = new faceapi.LabeledFaceDescriptors(
+            "owner",
+            [new Float32Array(savedDescriptor)]
+        );
+
+        const faceMatcher = new faceapi.FaceMatcher([labeledDescriptor], 0.5);
+        const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+
+        if (bestMatch.label === "owner") {
+            submitStarted = true;
+            setFaceStatus("✅ ผ่านการตรวจจับคนจริง และยืนยันใบหน้าสำเร็จ", "success");
+
+            document.getElementById("actionInput").value = pendingAction;
+
+            setTimeout(() => {
+                document.getElementById("checkinForm").submit();
+            }, 500);
+        } else {
+            setFaceStatus("❌ ใบหน้าไม่ตรงกับบัญชีนี้", "error");
+        }
     }
 
     async function verifyFaceAndSubmit() {
@@ -495,71 +663,30 @@
                 return;
             }
 
-            setFaceStatus("👉 กรุณาเอาหน้าเข้าใกล้กล้อง", "warning");
+            const challenges = getRandomChallenges();
 
-            const firstDetection = await faceapi
-                .detectSingleFace(faceVideo, new faceapi.TinyFaceDetectorOptions())
-                .withFaceLandmarks()
-                .withFaceDescriptor();
+            setFaceStatus("กำลังเริ่มตรวจจับคนจริงแบบสุ่ม...", "warning");
+            await wait(800);
 
-            if (!firstDetection) {
-                setFaceStatus("❌ ไม่พบใบหน้า กรุณาหันหน้าเข้ากล้องให้ชัด", "error");
-                return;
-            }
+            let lastDetection = null;
 
-            firstFaceSize = firstDetection.detection.box.width;
-
-            if (firstFaceSize < 130) {
-                setFaceStatus("👉 กรุณาเอาหน้าเข้าใกล้กล้องอีกนิด", "warning");
-                return;
-            }
-
-            setFaceStatus("👉 ตอนนี้ถอยหน้าออกจากกล้อง ภายใน 3 วินาที", "warning");
-
-            await new Promise(resolve => setTimeout(resolve, 3500));
-
-            const secondDetection = await faceapi
-                .detectSingleFace(faceVideo, new faceapi.TinyFaceDetectorOptions())
-                .withFaceLandmarks()
-                .withFaceDescriptor();
-
-            if (!secondDetection) {
-                setFaceStatus("❌ ไม่พบใบหน้าหลังถอยออก กรุณาลองใหม่", "error");
-                return;
-            }
-
-            const secondFaceSize = secondDetection.detection.box.width;
-
-            if (secondFaceSize > firstFaceSize * 0.88) {
-                setFaceStatus("❌ กรุณาถอยหน้าออกให้ชัดเจน แล้วกดสแกนใหม่", "error");
-                return;
+            for (let i = 0; i < challenges.length; i++) {
+                lastDetection = await runOneChallenge(challenges[i], i, challenges.length);
             }
 
             setFaceStatus("กำลังตรวจสอบใบหน้า...", "warning");
 
-            const labeledDescriptor = new faceapi.LabeledFaceDescriptors(
-                "owner",
-                [new Float32Array(savedDescriptor)]
-            );
+            const finalDetection = await detectFace();
 
-            const faceMatcher = new faceapi.FaceMatcher([labeledDescriptor], 0.5);
-            const bestMatch = faceMatcher.findBestMatch(secondDetection.descriptor);
-
-            if (bestMatch.label === "owner") {
-                submitStarted = true;
-                setFaceStatus("✅ ผ่านการตรวจจับคนจริง และยืนยันใบหน้าสำเร็จ", "success");
-
-                document.getElementById("actionInput").value = pendingAction;
-
-                setTimeout(() => {
-                    document.getElementById("checkinForm").submit();
-                }, 500);
-            } else {
-                setFaceStatus("❌ ใบหน้าไม่ตรงกับบัญชีนี้", "error");
+            if (!finalDetection) {
+                setFaceStatus("❌ ไม่พบใบหน้าตอนยืนยัน กรุณาลองใหม่", "error");
+                return;
             }
 
+            await verifyDetectedFace(finalDetection);
+
         } catch (err) {
-            setFaceStatus("❌ เกิดข้อผิดพลาด: " + err.message, "error");
+            setFaceStatus("❌ " + err.message + " กรุณากดเริ่มสแกนใหม่", "error");
             console.error(err);
         }
     }
