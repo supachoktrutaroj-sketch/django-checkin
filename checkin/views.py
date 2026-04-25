@@ -518,8 +518,8 @@ def face_verify_page(request):
 
 @login_required
 def checkin_view(request):
-    office_lat = 13.878779447272407
-    office_lon = 100.5912086091356
+    office_lat = 13.942424421113266
+    office_lon = 100.62719851534256
     allowed_radius = 500
     location_name = "จุดเช็คอินหลัก"
 
