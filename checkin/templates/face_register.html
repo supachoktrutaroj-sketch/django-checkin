@@ -74,18 +74,18 @@
         <button class="btn btn-green" onclick="registerFace()">บันทึกใบหน้า</button>
     </div>
 
-    <div id="status" class="status-box">รอโหลด...</div>
+    <div id="status" class="status-box">รอโหลดระบบ...</div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
 <script>
     const video = document.getElementById('video');
     const statusBox = document.getElementById('status');
     const MODEL_URL = "{% static 'models' %}";
 
-    let step = 1;
     let modelsLoaded = false;
+    let cameraStarted = false;
 
     function setStatus(msg, type = 'normal') {
         statusBox.textContent = msg;
@@ -96,88 +96,58 @@
     }
 
     async function loadModels() {
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-        modelsLoaded = true;
-        setStatus("👉 กรุณากะพริบตา", "warning");
+        try {
+            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+
+            modelsLoaded = true;
+            setStatus("✅ โหลดระบบสำเร็จ กรุณากดเปิดกล้อง", "success");
+        } catch (err) {
+            setStatus("❌ โหลดระบบจดจำใบหน้าไม่สำเร็จ", "error");
+            console.error(err);
+        }
     }
 
     window.onload = loadModels;
 
     async function startCamera() {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
-        detectLoop();
-    }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "user" },
+                audio: false
+            });
 
-    function eyeRatio(eye) {
-        const v1 = Math.abs(eye[1].y - eye[5].y);
-        const v2 = Math.abs(eye[2].y - eye[4].y);
-        const h = Math.abs(eye[0].x - eye[3].x);
-        return (v1 + v2) / (2 * h);
-    }
+            video.srcObject = stream;
+            cameraStarted = true;
 
-    function getDirection(landmarks) {
-        const nose = landmarks.getNose()[3];
-        const jaw = landmarks.getJawOutline();
-        const center = (jaw[0].x + jaw[16].x) / 2;
-
-        if (nose.x < center - 10) return "left";
-        if (nose.x > center + 10) return "right";
-        return "center";
-    }
-
-    async function detectLoop() {
-        if (!modelsLoaded) return;
-
-        const res = await faceapi
-            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-            .withFaceLandmarks();
-
-        if (res) {
-            const left = res.landmarks.getLeftEye();
-            const right = res.landmarks.getRightEye();
-            const ratio = (eyeRatio(left) + eyeRatio(right)) / 2;
-
-            const dir = getDirection(res.landmarks);
-
-            // STEP 1
-            if (step === 1 && ratio < 0.22) {
-                step = 2;
-                setStatus("✅ กะพริบแล้ว → หันซ้าย", "success");
-            }
-
-            // STEP 2
-            else if (step === 2 && dir === "left") {
-                step = 3;
-                setStatus("✅ หันซ้ายแล้ว → หันขวา", "success");
-            }
-
-            // STEP 3
-            else if (step === 3 && dir === "right") {
-                step = 4;
-                setStatus("🎉 ยืนยันสำเร็จ กดบันทึกได้", "success");
-            }
+            setStatus("✅ กล้องพร้อมแล้ว กรุณามองตรงแล้วกดบันทึกใบหน้า", "success");
+        } catch (err) {
+            setStatus("❌ เปิดกล้องไม่สำเร็จ: " + err.message, "error");
         }
-
-        requestAnimationFrame(detectLoop);
     }
 
     function getCookie(name) {
         let v = null;
         document.cookie.split(';').forEach(c => {
             c = c.trim();
-            if (c.startsWith(name + '=')) v = decodeURIComponent(c.substring(name.length + 1));
+            if (c.startsWith(name + '=')) {
+                v = decodeURIComponent(c.substring(name.length + 1));
+            }
         });
         return v;
     }
 
     async function registerFace() {
-
-        if (step !== 4) {
-            return setStatus("❌ กรุณาทำให้ครบ 3 ขั้นตอน", "error");
+        if (!modelsLoaded) {
+            return setStatus("⏳ กรุณารอโหลดระบบก่อน", "warning");
         }
+
+        if (!cameraStarted || !video.srcObject) {
+            return setStatus("⚠️ กรุณากดเปิดกล้องก่อน", "warning");
+        }
+
+        setStatus("กำลังตรวจจับใบหน้า...", "warning");
 
         const result = await faceapi
             .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
@@ -185,7 +155,7 @@
             .withFaceDescriptor();
 
         if (!result) {
-            return setStatus("❌ ไม่พบใบหน้า", "error");
+            return setStatus("❌ ไม่พบใบหน้า กรุณามองตรงเข้ากล้อง", "error");
         }
 
         const res = await fetch("{% url 'save_face_descriptor' %}", {
@@ -202,7 +172,7 @@
         const data = await res.json();
 
         if (data.success) {
-            setStatus("✅ บันทึกสำเร็จ", "success");
+            setStatus("✅ บันทึกใบหน้าสำเร็จ", "success");
         } else {
             setStatus("❌ " + data.message, "error");
         }
