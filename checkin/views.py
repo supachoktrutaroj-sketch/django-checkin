@@ -30,6 +30,24 @@ from reportlab.pdfbase.ttfonts import TTFont
 from .models import CheckInRecord, SystemSetting, UserFaceProfile, UserProfile
 
 
+def is_valid_face_descriptor(descriptor):
+    return (
+        isinstance(descriptor, list)
+        and len(descriptor) == 128
+        and all(isinstance(x, (int, float)) for x in descriptor)
+    )
+
+
+def calculate_face_distance(desc1, desc2):
+    try:
+        total = 0
+        for a, b in zip(desc1, desc2):
+            total += (float(a) - float(b)) ** 2
+        return math.sqrt(total)
+    except Exception:
+        return 999
+
+
 def get_pdf_font():
     font_paths = [
         r"C:\Windows\Fonts\tahoma.ttf",
