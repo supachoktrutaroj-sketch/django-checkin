@@ -3,108 +3,262 @@
 {% block content %}
 
 <style>
-    .admin-title {
-        margin: 0;
-        font-weight: bold;
+    .admin-header {
+        margin-bottom: 24px;
     }
 
-    .top-bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
+    .admin-title {
+        font-size: 32px;
+        font-weight: 900;
+        margin-bottom: 10px;
+        color: #0f172a;
+    }
+
+    .admin-subtitle {
+        background: #dbeafe;
+        border: 1px solid #93c5fd;
+        color: #1d4ed8;
+        padding: 14px 18px;
+        border-radius: 14px;
+        font-weight: 800;
+    }
+
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+        margin-bottom: 28px;
+    }
+
+    .stat-card {
+        color: white;
+        padding: 26px;
+        border-radius: 20px;
+        box-shadow: 0 16px 35px rgba(15, 23, 42, 0.18);
+        text-align: center;
+    }
+
+    .stat-blue {
+        background: linear-gradient(135deg, #3b82f6, #1e40af);
+    }
+
+    .stat-green {
+        background: linear-gradient(135deg, #22c55e, #166534);
+    }
+
+    .stat-red {
+        background: linear-gradient(135deg, #ef4444, #991b1b);
+    }
+
+    .stat-label {
+        font-size: 18px;
+        font-weight: 800;
+        margin-bottom: 12px;
+    }
+
+    .stat-number {
+        font-size: 42px;
+        font-weight: 900;
+        line-height: 1;
     }
 
     .box {
         background: white;
-        border-radius: 14px;
-        padding: 20px;
-        margin-bottom: 25px;
+        border-radius: 20px;
+        padding: 26px;
+        margin-bottom: 28px;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+    }
+
+    .box-title {
+        font-size: 24px;
+        font-weight: 900;
+        margin-bottom: 18px;
+        color: #0f172a;
     }
 
     .setting-summary {
-        display: flex;
-        gap: 20px;
-        flex-wrap: wrap;
-        font-weight: bold;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
     }
 
-    .setting-summary span {
+    .time-pill,
+    #deadline-status {
+        padding: 18px;
+        border-radius: 16px;
+        font-weight: 900;
+        text-align: center;
+        min-height: 86px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        line-height: 1.5;
+    }
+
+    .time-pill {
         background: #eff6ff;
         color: #1e3a8a;
-        padding: 10px 14px;
-        border-radius: 10px;
+    }
+
+    .table-wrap {
+        overflow-x: auto;
+        border-radius: 18px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
     }
 
     table {
         width: 100%;
         border-collapse: collapse;
+        background: white;
+        overflow: hidden;
     }
 
-    table th,
-    table td {
-        padding: 12px;
+    th {
+        background: linear-gradient(135deg, #dc2626, #991b1b);
+        color: white;
+        padding: 16px;
+        font-size: 17px;
+        font-weight: 900;
+        letter-spacing: 0.3px;
+    }
+
+    td {
+        padding: 16px;
+        text-align: center;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    tr:nth-child(even) {
+        background: #f8fafc;
+    }
+
+    tr:hover {
+        background: #e0f2fe;
+        transition: 0.2s;
+    }
+
+    .number-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        background: #fee2e2;
+        color: #991b1b;
+        font-weight: 900;
+    }
+
+    .username-pill {
+        display: inline-block;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #1e3a8a;
+        font-weight: 900;
+    }
+
+    .empty-box {
+        background: #dcfce7;
+        color: #166534;
+        padding: 22px;
+        border-radius: 16px;
+        font-size: 20px;
+        font-weight: 900;
         text-align: center;
     }
 
-    .empty-text {
-        color: green;
-        font-weight: bold;
-        font-size: 18px;
-    }
+    @media (max-width: 900px) {
 
-    @media (max-width: 768px) {
-        .top-bar {
-            flex-direction: column;
-            align-items: flex-start;
+        .stat-grid,
+        .setting-summary {
+            grid-template-columns: 1fr;
         }
 
-        .setting-summary {
-            flex-direction: column;
-            gap: 10px;
+        .admin-title {
+            font-size: 26px;
+        }
+
+        .stat-number {
+            font-size: 34px;
         }
     }
 </style>
 
-<div class="top-bar">
+<div class="admin-header">
     <h2 class="admin-title">🛠️ Admin Dashboard</h2>
-</div>
-
-<div class="box">
-    <h4>⏰ ข้อมูลเวลา</h4>
-    <div class="setting-summary">
-        <span>เวลากลับเข้ากรม: {{ system_setting.return_deadline|time:"H:i" }} น.</span>
-        <span>วันที่และเวลาปัจจุบัน: <strong id="realtime-datetime">--</strong></span>
-        <span id="deadline-status">กำลังโหลด...</span>
+    <div class="admin-subtitle">
+        ระบบแสดงรายชื่อผู้ที่ยังไม่เช็คอิน และข้อมูลเวลากลับเข้ากรมแบบเรียลไทม์
     </div>
 </div>
 
-<!-- 🔥 ตรงนี้แค่เปลี่ยนข้อมูล -->
+<div class="stat-grid">
+    <div class="stat-card stat-blue">
+        <div class="stat-label">เวลากลับเข้ากรม</div>
+        <div class="stat-number">{{ system_setting.return_deadline|time:"H:i" }}</div>
+    </div>
+
+    <div class="stat-card stat-green">
+        <div class="stat-label">สถานะเวลา</div>
+        <div class="stat-number" id="status-text">--</div>
+    </div>
+
+    <div class="stat-card stat-red">
+        <div class="stat-label">ยังไม่เช็คอิน</div>
+        <div class="stat-number">{{ not_checkedin_users|length }}</div>
+    </div>
+</div>
+
 <div class="box">
-    <h4>🚨 รายชื่อคนที่ยังไม่มา / ยังไม่เช็คอิน</h4>
+    <div class="box-title">⏰ ข้อมูลเวลา</div>
+
+    <div class="setting-summary">
+        <div class="time-pill">
+            เวลากลับเข้ากรม<br>
+            {{ system_setting.return_deadline|time:"H:i" }} น.
+        </div>
+
+        <div class="time-pill">
+            วันที่และเวลาปัจจุบัน<br>
+            <span id="realtime-datetime">--</span>
+        </div>
+
+        <div id="deadline-status">
+            กำลังโหลด...
+        </div>
+    </div>
+</div>
+
+<div class="box">
+    <div class="box-title">🚨 รายชื่อคนที่ยังไม่มา / ยังไม่เช็คอิน</div>
 
     {% if not_checkedin_users %}
-    <table border="1">
-        <tr style="background:#dc2626; color:white;">
-            <th>#</th>
-            <th>ชื่อผู้ใช้</th>
-            <th>ชื่อ</th>
-            <th>นามสกุล</th>
-        </tr>
+    <div class="table-wrap">
+        <table>
+            <tr>
+                <th>#</th>
+                <th>ชื่อผู้ใช้</th>
+                <th>ชื่อ</th>
+                <th>นามสกุล</th>
+            </tr>
 
-        {% for user in not_checkedin_users %}
-        <tr>
-            <td>{{ forloop.counter }}</td>
-            <td>{{ user.username }}</td>
-            <td>{{ user.first_name|default:"-" }}</td>
-            <td>{{ user.last_name|default:"-" }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+            {% for user in not_checkedin_users %}
+            <tr>
+                <td><span class="number-badge">{{ forloop.counter }}</span></td>
+                <td><span class="username-pill">{{ user.username }}</span></td>
+                <td>{{ user.first_name|default:"-" }}</td>
+                <td>{{ user.last_name|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
     {% else %}
-    <p class="empty-text">✅ ทุกคนเช็คอินแล้ว</p>
+    <div class="empty-box">✅ ทุกคนเช็คอินแล้ว</div>
     {% endif %}
 </div>
 
@@ -129,21 +283,25 @@
             `${day}/${month}/${year} ${hh}:${mm}:${ss}`;
 
         const el = document.getElementById("deadline-status");
+        const statusText = document.getElementById("status-text");
 
         if (now > deadline) {
             const diff = Math.floor((now - deadline) / 60000);
-            el.innerHTML = `❌ เลยเวลาแล้ว <b>${diff}</b> นาที`;
+
+            el.innerHTML = `❌ เลยเวลาแล้ว<br><b>${diff}</b> นาที`;
             el.style.background = "#fee2e2";
             el.style.color = "#991b1b";
+
+            statusText.textContent = "เลยเวลา";
         } else {
             const diff = Math.floor((deadline - now) / 60000);
-            el.innerHTML = `⏳ เหลืออีก <b>${diff}</b> นาที`;
+
+            el.innerHTML = `⏳ เหลืออีก<br><b>${diff}</b> นาที`;
             el.style.background = "#dcfce7";
             el.style.color = "#166534";
-        }
 
-        el.style.padding = "10px";
-        el.style.borderRadius = "10px";
+            statusText.textContent = "ปกติ";
+        }
     }
 
     updateClock();
