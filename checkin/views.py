@@ -1,4 +1,5 @@
 import math
+import os
 import json
 import urllib.request
 import urllib.error
@@ -49,20 +50,25 @@ def calculate_face_distance(desc1, desc2):
 
 
 def get_pdf_font():
-    font_paths = [
-        r"C:\Windows\Fonts\tahoma.ttf",
-        r"C:\Windows\Fonts\THSarabunNew.ttf",
-        r"C:\Windows\Fonts\arial.ttf",
-    ]
+    """
+    โหลดฟอนต์ไทยสำหรับ PDF
+    ต้องมีไฟล์ฟอนต์อยู่ที่:
+    checkin/static/fonts/THSarabunNew.ttf
+    """
+    font_path = os.path.join(
+        settings.BASE_DIR,
+        'checkin',
+        'static',
+        'fonts',
+        'THSarabunNew.ttf'
+    )
 
-    for path in font_paths:
-        try:
-            pdfmetrics.registerFont(TTFont("ThaiFont", path))
-            return "ThaiFont"
-        except Exception:
-            pass
-
-    return "Helvetica"
+    try:
+        pdfmetrics.registerFont(TTFont("ThaiFont", font_path))
+        return "ThaiFont"
+    except Exception as e:
+        print("โหลดฟอนต์ไทยไม่สำเร็จ:", e)
+        return "Helvetica"
 
 
 @csrf_exempt
