@@ -765,9 +765,24 @@ def export_pdf(request):
         return redirect('dashboard')
 
     font_name = get_pdf_font()
+    today = timezone.localdate()
+
+    checked_in_user_ids = (
+        CheckInRecord.objects
+        .filter(action='checkin', created_at__date=today)
+        .values_list('user_id', flat=True)
+        .distinct()
+    )
+
+    not_checkedin_users = (
+        User.objects
+        .filter(is_superuser=False)
+        .exclude(id__in=checked_in_user_ids)
+        .order_by('username')
+    )
 
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename=attendance_report.pdf'
+    response['Content-Disposition'] = 'attachment; filename=not_checkedin_report.pdf'
 
     doc = SimpleDocTemplate(
         response,
@@ -785,123 +800,95 @@ def export_pdf(request):
         'ThaiTitle',
         parent=styles['Title'],
         fontName=font_name,
-        fontSize=20,
-        leading=24,
+        fontSize=24,
+        leading=28,
         alignment=1,
         textColor=colors.HexColor('#0f172a'),
-        spaceAfter=6,
+        spaceAfter=8,
     )
 
     subtitle_style = ParagraphStyle(
         'ThaiSubtitle',
         parent=styles['Normal'],
         fontName=font_name,
-        fontSize=10,
-        leading=14,
+        fontSize=13,
+        leading=16,
         alignment=1,
         textColor=colors.HexColor('#475569'),
-        spaceAfter=12,
+        spaceAfter=16,
     )
 
     generated_at = timezone.localtime().strftime('%d/%m/%Y %H:%M:%S')
 
-    elements.append(Paragraph("รายงานการเช็คอิน - เช็คเอาต์", title_style))
+    elements.append(Paragraph("รายงานรายชื่อผู้ที่ยังไม่มา / ยังไม่เช็คอิน", title_style))
     elements.append(Paragraph(f"วันที่ออกรายงาน: {generated_at}", subtitle_style))
-    elements.append(Spacer(1, 8))
+    elements.append(Spacer(1, 10))
 
     data = [[
         'ลำดับ',
         'ชื่อผู้ใช้',
-        'ชื่อ-นามสกุล',
+        'ชื่อ',
+        'นามสกุล',
         'เบอร์โทร',
-        'วันที่',
-        'เวลา',
-        'ประเภท',
         'สถานะ',
-        'ละติจูด',
-        'ลองจิจูด',
-        'ระยะทาง',
     ]]
 
-    records = CheckInRecord.objects.select_related('user').all().order_by('-created_at')
-
-    for index, r in enumerate(records, start=1):
-        local_dt = timezone.localtime(r.created_at)
-
-        action_text = "เข้างาน" if r.action == "checkin" else "ออกงาน"
-        status_text = "มาสาย" if r.status == "late" else "ปกติ"
-
-        full_name = f"{r.user.first_name} {r.user.last_name}".strip()
-        if not full_name:
-            full_name = "-"
-
-        profile = getattr(r.user, 'userprofile', None)
+    for index, user in enumerate(not_checkedin_users, start=1):
+        profile = getattr(user, 'userprofile', None)
         phone_number = profile.phone_number if profile and profile.phone_number else "-"
 
         data.append([
             str(index),
-            r.user.username,
-            full_name,
+            user.username,
+            user.first_name or "-",
+            user.last_name or "-",
             phone_number,
-            local_dt.strftime('%d/%m/%Y'),
-            local_dt.strftime('%H:%M:%S'),
-            action_text,
-            status_text,
-            str(r.latitude),
-            str(r.longitude),
-            f"{r.distance:.2f} ม.",
+            "ยังไม่เช็คอิน",
         ])
 
     if len(data) == 1:
-        data.append(['-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-'])
+        data.append(['-', '-', '-', '-', '-', 'ทุกคนเช็คอินแล้ว'])
 
     table = Table(
         data,
         repeatRows=1,
         colWidths=[
-            1.1 * cm,
-            2.4 * cm,
-            3.4 * cm,
-            2.8 * cm,
-            2.2 * cm,
-            2.0 * cm,
-            2.2 * cm,
-            2.0 * cm,
-            3.1 * cm,
-            3.1 * cm,
-            2.3 * cm,
+            2 * cm,
+            5 * cm,
+            5 * cm,
+            5 * cm,
+            4 * cm,
+            5 * cm,
         ],
     )
 
     table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), font_name),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
         ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
 
         ('FONTNAME', (0, 1), (-1, -1), font_name),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('FONTSIZE', (0, 1), (-1, -1), 11),
         ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#111827')),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
 
-        ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#cbd5e1')),
-        ('LINEBELOW', (0, 0), (-1, 0), 1.2, colors.HexColor('#1e3a8a')),
-
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [
             colors.white,
             colors.HexColor('#f8fafc')
         ]),
 
-        ('TOPPADDING', (0, 0), (-1, -1), 7),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 9),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
     ]))
 
     elements.append(table)
-
     doc.build(elements)
+
     return response
