@@ -450,7 +450,6 @@ def save_face_descriptor(request):
 
         profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
 
-        # 1 บัญชี ลงทะเบียนใบหน้าได้แค่ 1 ครั้ง
         if profile.face_descriptor:
             return JsonResponse({
                 'success': False,
@@ -458,7 +457,6 @@ def save_face_descriptor(request):
                 'error': 'บัญชีนี้ลงทะเบียนใบหน้าไว้แล้ว ไม่สามารถลงทะเบียนซ้ำได้'
             }, status=400)
 
-        # ป้องกันไม่ให้ใบหน้าเดียวกันไปลงทะเบียนกับบัญชีอื่น
         duplicate_threshold = 0.45
         other_profiles = (
             UserFaceProfile.objects
@@ -667,69 +665,34 @@ def admin_dashboard(request):
         return redirect('dashboard')
 
     today = timezone.localdate()
+    system_setting = get_system_setting()
 
-    records = CheckInRecord.objects.select_related('user').order_by('-created_at')
+    checked_in_user_ids = (
+        CheckInRecord.objects
+        .filter(action='checkin', created_at__date=today)
+        .values_list('user_id', flat=True)
+        .distinct()
+    )
 
-    q = request.GET.get('q', '').strip()
-    status = request.GET.get('status', '').strip()
-    date = request.GET.get('date', '').strip()
-    action = request.GET.get('action', '').strip()
-
-    if q:
-        records = records.filter(
-            Q(user__username__icontains=q) |
-            Q(user__first_name__icontains=q) |
-            Q(user__last_name__icontains=q)
-        )
-
-    if status:
-        records = records.filter(status=status)
-
-    if action:
-        records = records.filter(action=action)
-
-    if date:
-        records = records.filter(created_at__date=date)
-
-    today_records = CheckInRecord.objects.filter(created_at__date=today)
-    total_today = today_records.filter(action='checkin').count()
-    late_today = today_records.filter(action='checkin', status='late').count()
-    checkout_today = today_records.filter(action='checkout').count()
-    total_users = User.objects.filter(is_superuser=False).count()
-    checked_in_users_today = today_records.filter(action='checkin').values('user').distinct().count()
-    absent_today = max(total_users - checked_in_users_today, 0)
-
-    latest_record = today_records.order_by('-created_at').select_related('user').first()
-
-    returned_users, not_returned_users = get_return_status_summary()
+    not_checkedin_users = (
+        User.objects
+        .filter(is_superuser=False)
+        .exclude(id__in=checked_in_user_ids)
+        .order_by('username')
+    )
 
     now_local = timezone.localtime()
-    system_setting = get_system_setting()
     deadline = now_local.replace(
         hour=system_setting.return_deadline.hour,
         minute=system_setting.return_deadline.minute,
         second=0,
         microsecond=0,
     )
-    show_return_alert = now_local > deadline and len(not_returned_users) > 0
 
     context = {
-        'records': records,
-        'total_today': total_today,
-        'late_today': late_today,
-        'checkout_today': checkout_today,
-        'absent_today': absent_today,
-        'latest_record': latest_record,
-        'q': q,
-        'status': status,
-        'date': date,
-        'action': action,
-        'returned_count': len(returned_users),
-        'not_returned_count': len(not_returned_users),
-        'not_returned_users': not_returned_users,
-        'show_return_alert': show_return_alert,
-        'return_deadline': deadline.strftime('%H:%M'),
+        'not_checkedin_users': not_checkedin_users,
         'system_setting': system_setting,
+        'return_deadline': deadline.strftime('%H:%M'),
     }
 
     return render(request, 'admin_dashboard.html', context)
