@@ -143,13 +143,10 @@ def get_return_status_summary():
 
 
 def build_line_summary_message(trigger_record=None):
-    returned_users, not_returned_users = get_return_status_summary()
-
-    returned_count = len(returned_users)
-    not_returned_count = len(not_returned_users)
-
+    today = timezone.localdate()
     now_local = timezone.localtime()
     system_setting = get_system_setting()
+
     deadline = now_local.replace(
         hour=system_setting.return_deadline.hour,
         minute=system_setting.return_deadline.minute,
@@ -157,38 +154,80 @@ def build_line_summary_message(trigger_record=None):
         microsecond=0,
     )
 
+    # ใช้เฉพาะผู้ใช้จริงเท่านั้น ไม่เอา admin / staff / superuser / user ที่ปิดใช้งาน
+    real_users = User.objects.filter(
+        is_superuser=False,
+        is_staff=False,
+        is_active=True,
+    )
+
+    checked_in_user_ids = (
+        CheckInRecord.objects
+        .filter(
+            action='checkin',
+            created_at__date=today,
+            user__is_superuser=False,
+            user__is_staff=False,
+            user__is_active=True,
+        )
+        .values_list('user_id', flat=True)
+        .distinct()
+    )
+
+    checked_in_user_ids_set = set(checked_in_user_ids)
+    checked_count = len(checked_in_user_ids_set)
+
+    not_checkedin_users = (
+        real_users
+        .exclude(id__in=checked_in_user_ids_set)
+        .order_by('username')
+    )
+
+    not_checked_count = not_checkedin_users.count()
+
     lines = []
 
-    if trigger_record:
-        action_text = 'กลับเข้ากรม' if trigger_record.action == 'checkin' else 'ออกนอกกรม'
-        lines.append("📢 มีการอัปเดตการเช็คชื่อ")
-        lines.append(f"ชื่อ: {trigger_record.user.username}")
-        lines.append(f"รายการ: {action_text}")
-        lines.append(f"เวลา: {timezone.localtime(trigger_record.created_at).strftime('%H:%M:%S')}")
-        lines.append("")
+    # ก่อนถึงเวลากำหนด: ตอนเช็คอินให้แจ้งจำนวนรวมเหมือนเดิม
+    if now_local <= deadline:
+        if trigger_record:
+            action_text = 'เช็คอินแล้ว' if trigger_record.action == 'checkin' else 'เช็คเอาต์แล้ว'
+            lines.append("📢 มีการอัปเดตการเช็คชื่อ")
+            lines.append(f"ชื่อ: {trigger_record.user.username}")
+            lines.append(f"รายการ: {action_text}")
+            lines.append(f"เวลา: {timezone.localtime(trigger_record.created_at).strftime('%H:%M:%S')}")
+            lines.append("")
 
-    lines.append(f"✅ กลับแล้ว: {returned_count} คน")
-    lines.append(f"⏳ ยังไม่กลับ: {not_returned_count} คน")
+        lines.append(f"✅ เช็คอินแล้ว: {checked_count} คน")
+        lines.append(f"⏳ ยังไม่มา: {not_checked_count} คน")
+        lines.append(f"⏰ เวลากำหนด: {deadline.strftime('%H:%M')} น.")
 
-    if not_returned_users:
-        lines.append("")
-        lines.append("รายชื่อที่ยังไม่กลับ:")
-        for i, item in enumerate(not_returned_users[:20], start=1):
-            out_time = timezone.localtime(item.created_at).strftime('%H:%M:%S')
-            lines.append(f"{i}. {item.user.username} (ออก {out_time})")
+        return "\n".join(lines)
 
-        if len(not_returned_users) > 20:
-            lines.append(f"... และอีก {len(not_returned_users) - 20} คน")
+    # หลังเลยเวลากำหนด: แจ้งรายชื่อคนที่ยังไม่มา พร้อมเบอร์โทร
+    lines.append("🚨 เลยเวลากลับเข้ากรมแล้ว")
+    lines.append(f"เวลากำหนด: {deadline.strftime('%H:%M')} น.")
+    lines.append(f"เวลาอัปเดต: {now_local.strftime('%H:%M:%S')}")
+    lines.append("")
+    lines.append(f"✅ เช็คอินแล้ว: {checked_count} คน")
+    lines.append(f"❌ ยังไม่มา: {not_checked_count} คน")
+    lines.append("")
 
-    if now_local > deadline and not_returned_count > 0:
-        lines.append("")
-        lines.append(
-            f"🚨 เลยเวลากลับ {deadline.strftime('%H:%M')} แล้ว "
-            f"แต่ยังมีผู้ที่ไม่กลับ {not_returned_count} คน"
-        )
+    if not_checkedin_users.exists():
+        lines.append("รายชื่อคนที่ยังไม่มา / ยังไม่เช็คอิน:")
+        for i, user in enumerate(not_checkedin_users, start=1):
+            profile = getattr(user, 'userprofile', None)
+            phone = profile.phone_number if profile and profile.phone_number else "-"
+
+            full_name = f"{user.first_name} {user.last_name}".strip()
+            if not full_name:
+                full_name = user.username
+
+            lines.append(f"{i}. {full_name}")
+            lines.append(f"   เบอร์โทร: {phone}")
+    else:
+        lines.append("✅ ทุกคนเช็คอินครบแล้ว")
 
     return "\n".join(lines)
-
 
 def send_line_push_message(message_text):
     channel_access_token = getattr(settings, 'LINE_CHANNEL_ACCESS_TOKEN', '').strip()
@@ -344,8 +383,8 @@ def dashboard(request):
     late_count = today_records.filter(action='checkin', status='late').count()
     checkout_count = today_records.filter(action='checkout').count()
 
-    total_users = User.objects.filter(is_superuser=False).count()
-    users_checked_in_today = today_records.filter(action='checkin').values('user').distinct().count()
+    total_users = User.objects.filter(is_superuser=False, is_staff=False, is_active=True).count()
+    users_checked_in_today = today_records.filter(action='checkin', user__is_superuser=False, user__is_staff=False, user__is_active=True).values('user').distinct().count()
     not_checked_in = max(total_users - users_checked_in_today, 0)
 
     daily_stats = (
@@ -522,8 +561,8 @@ def face_verify_page(request):
 
 @login_required
 def checkin_view(request):
-    office_lat = 13.878779447272407
-    office_lon = 100.5912086091356
+    office_lat = 13.819810075005167
+    office_lon = 100.52961418065506
     allowed_radius = 500
     location_name = "จุดเช็คอินหลัก"
 
@@ -682,7 +721,7 @@ def admin_dashboard(request):
 
     not_checkedin_users = (
         User.objects
-        .filter(is_superuser=False)
+        .filter(is_superuser=False, is_staff=False, is_active=True)
         .exclude(id__in=checked_in_user_ids)
         .order_by('username')
     )
@@ -776,7 +815,7 @@ def export_pdf(request):
 
     not_checkedin_users = (
         User.objects
-        .filter(is_superuser=False)
+        .filter(is_superuser=False, is_staff=False, is_active=True)
         .exclude(id__in=checked_in_user_ids)
         .order_by('username')
     )
