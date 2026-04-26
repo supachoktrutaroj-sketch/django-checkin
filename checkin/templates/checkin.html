@@ -297,10 +297,9 @@
     let submitStarted = false;
 
     let baseFaceSize = null;
-    let maxEyeRatio = 0;
-    let eyeWasClosed = false;
+    let nodBaseY = null;
 
-    const CHALLENGE_SECONDS = 5;
+    const CHALLENGE_SECONDS = 10;
     const faceModal = document.getElementById("faceModal");
     const faceVideo = document.getElementById("faceVideo");
     const faceStatus = document.getElementById("faceStatus");
@@ -436,9 +435,7 @@
 
         pendingAction = action;
         submitStarted = false;
-        baseFaceSize = null;
-        maxEyeRatio = 0;
-        eyeWasClosed = false;
+        resetChallengeState();
         faceModal.style.display = "flex";
 
         if (!faceModelsLoaded) {
@@ -470,9 +467,7 @@
         faceModal.style.display = "none";
         pendingAction = null;
         submitStarted = false;
-        baseFaceSize = null;
-        maxEyeRatio = 0;
-        eyeWasClosed = false;
+        resetChallengeState();
 
         if (faceStream) {
             faceStream.getTracks().forEach(track => track.stop());
@@ -483,43 +478,45 @@
         faceCameraStarted = false;
     }
 
-    function distancePoint(a, b) {
-        return Math.hypot(a.x - b.x, a.y - b.y);
+    function resetChallengeState() {
+        baseFaceSize = null;
+        nodBaseY = null;
     }
 
-    function eyeRatio(eye) {
-        const A = distancePoint(eye[1], eye[5]);
-        const B = distancePoint(eye[2], eye[4]);
-        const C = distancePoint(eye[0], eye[3]);
-
-        if (C === 0) return 1;
-        return (A + B) / (2.0 * C);
+    function wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    function isBlinkPassed(landmarks) {
-        const left = landmarks.getLeftEye();
-        const right = landmarks.getRightEye();
-        const ratio = (eyeRatio(left) + eyeRatio(right)) / 2;
+    async function detectFace() {
+        return await faceapi
+            .detectSingleFace(faceVideo, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+    }
 
-        if (ratio > maxEyeRatio) {
-            maxEyeRatio = ratio;
+    function getNose(landmarks) {
+        return landmarks.getNose()[3];
+    }
+
+    function isTurnLeftPassed(landmarks) {
+        const nose = getNose(landmarks);
+        return nose.x < faceVideo.videoWidth * 0.40;
+    }
+
+    function isTurnRightPassed(landmarks) {
+        const nose = getNose(landmarks);
+        return nose.x > faceVideo.videoWidth * 0.60;
+    }
+
+    function isNodPassed(landmarks) {
+        const nose = getNose(landmarks);
+
+        if (!nodBaseY) {
+            nodBaseY = nose.y;
+            return false;
         }
 
-        if (maxEyeRatio <= 0) return false;
-
-        const closedLevel = maxEyeRatio * 0.72;
-        const openLevel = maxEyeRatio * 0.90;
-
-        if (ratio < closedLevel) {
-            eyeWasClosed = true;
-        }
-
-        if (eyeWasClosed && ratio > openLevel) {
-            eyeWasClosed = false;
-            return true;
-        }
-
-        return false;
+        return Math.abs(nose.y - nodBaseY) > 18;
     }
 
     function isNearPassed(detection) {
@@ -546,39 +543,19 @@
 
     function getRandomChallenges() {
         const list = [
-            {
-                key: "blink",
-                text: "กะพริบตา 1 ครั้ง",
-            },
-            {
-                key: "near",
-                text: "เอาหน้าเข้าใกล้กล้อง",
-            },
-            {
-                key: "far",
-                text: "ถอยหน้าออกจากกล้อง",
-            }
+            { key: "left", text: "หันหน้าไปทางซ้าย" },
+            { key: "right", text: "หันหน้าไปทางขวา" },
+            { key: "nod", text: "พยักหน้า ขึ้น-ลง" },
+            { key: "near", text: "เอาหน้าเข้าใกล้กล้อง" },
+            { key: "far", text: "ถอยหน้าออกจากกล้อง" }
         ];
 
         list.sort(() => Math.random() - 0.5);
         return list.slice(0, 2);
     }
 
-    function wait(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    async function detectFace() {
-        return await faceapi
-            .detectSingleFace(faceVideo, new faceapi.TinyFaceDetectorOptions())
-            .withFaceLandmarks()
-            .withFaceDescriptor();
-    }
-
     async function runOneChallenge(challenge, index, total) {
-        baseFaceSize = null;
-        maxEyeRatio = 0;
-        eyeWasClosed = false;
+        resetChallengeState();
 
         const startedAt = Date.now();
         const deadline = startedAt + (CHALLENGE_SECONDS * 1000);
@@ -601,8 +578,12 @@
 
             let passed = false;
 
-            if (challenge.key === "blink") {
-                passed = isBlinkPassed(detection.landmarks);
+            if (challenge.key === "left") {
+                passed = isTurnLeftPassed(detection.landmarks);
+            } else if (challenge.key === "right") {
+                passed = isTurnRightPassed(detection.landmarks);
+            } else if (challenge.key === "nod") {
+                passed = isNodPassed(detection.landmarks);
             } else if (challenge.key === "near") {
                 passed = isNearPassed(detection);
             } else if (challenge.key === "far") {
