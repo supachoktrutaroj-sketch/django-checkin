@@ -709,6 +709,8 @@ def export_excel(request):
 
     ws.append([
         'ชื่อผู้ใช้',
+        'ชื่อ-นามสกุล',
+        'เบอร์โทร',
         'วันที่',
         'เวลา',
         'ประเภท',
@@ -725,8 +727,14 @@ def export_excel(request):
         action_text = "เข้างาน" if r.action == "checkin" else "ออกงาน"
         status_text = "มาสาย" if r.status == "late" else "ปกติ"
 
+        full_name = f"{r.user.first_name} {r.user.last_name}".strip() or "-"
+        profile = getattr(r.user, 'userprofile', None)
+        phone_number = profile.phone_number if profile and profile.phone_number else "-"
+
         ws.append([
             r.user.username,
+            full_name,
+            phone_number,
             local_dt.strftime('%d/%m/%Y'),
             local_dt.strftime('%H:%M:%S'),
             action_text,
@@ -799,6 +807,7 @@ def export_pdf(request):
         'ลำดับ',
         'ชื่อผู้ใช้',
         'ชื่อ-นามสกุล',
+        'เบอร์โทร',
         'วันที่',
         'เวลา',
         'ประเภท',
@@ -820,10 +829,14 @@ def export_pdf(request):
         if not full_name:
             full_name = "-"
 
+        profile = getattr(r.user, 'userprofile', None)
+        phone_number = profile.phone_number if profile and profile.phone_number else "-"
+
         data.append([
             str(index),
             r.user.username,
             full_name,
+            phone_number,
             local_dt.strftime('%d/%m/%Y'),
             local_dt.strftime('%H:%M:%S'),
             action_text,
@@ -834,22 +847,23 @@ def export_pdf(request):
         ])
 
     if len(data) == 1:
-        data.append(['-', '-', '-', '-', '-', '-', '-', '-', '-', '-'])
+        data.append(['-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-'])
 
     table = Table(
         data,
         repeatRows=1,
         colWidths=[
-            1.2 * cm,
+            1.1 * cm,
+            2.4 * cm,
+            3.4 * cm,
             2.8 * cm,
-            4.2 * cm,
-            2.4 * cm,
             2.2 * cm,
-            2.4 * cm,
+            2.0 * cm,
             2.2 * cm,
-            3.3 * cm,
-            3.3 * cm,
-            2.6 * cm,
+            2.0 * cm,
+            3.1 * cm,
+            3.1 * cm,
+            2.3 * cm,
         ],
     )
 
