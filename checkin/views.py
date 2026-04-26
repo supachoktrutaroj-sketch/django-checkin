@@ -563,7 +563,7 @@ def face_verify_page(request):
 def checkin_view(request):
     office_lat = 13.878779447272407
     office_lon = 100.5912086091356
-    allowed_radius = 500
+    allowed_radius = 600
     location_name = "จุดเช็คอินหลัก"
 
     face_profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
