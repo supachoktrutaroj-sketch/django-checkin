@@ -22,4 +22,10 @@ urlpatterns = [
     path('face-register/', views.face_register_page, name='face_register'),
     path('save-face-descriptor/', views.save_face_descriptor, name='save_face_descriptor'),
     path('face-verify/', views.face_verify_page, name='face_verify'),
+
+    # 🪖 ระบบจัดการกำลังพลสำหรับ Admin เท่านั้น (เพิ่มใหม่เข้าไปตรงนี้ครับ)
+    path('manage-users/', views.manage_users_view, name='manage_users'),
+    path('manage-users/add/', views.add_user_admin, name='add_user_admin'),
+    path('manage-users/edit/<int:user_id>/', views.edit_user_admin, name='edit_user_admin'),
+    path('manage-users/delete/<int:user_id>/', views.delete_user_admin, name='delete_user_admin'),
 ]
