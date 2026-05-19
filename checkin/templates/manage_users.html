@@ -1,132 +1,264 @@
+<script src="https://cdn.tailwindcss.com"></script>
 {% extends 'base.html' %}
-
 {% block content %}
-<div style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-    
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
-        <div>
-            <h2 style="font-size: 22px; color: #1f2937;">🪖 ระบบจัดการข้อมูลกำลังพล</h2>
-            <p style="font-size: 14px; color: #6b7280; margin-top: 4px;">เพิ่ม ลบ ค้นหา และปรับปรุงสถานะการปฏิบัติหน้าที่</p>
-        </div>
-        <button onclick="document.getElementById('add-modal').style.display='flex'" style="background: #2563eb; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;">
-            ➕ เพิ่มกำลังพลใหม่
-        </button>
+
+{% if messages %}
+    {% for message in messages %}
+    <div class="w-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium px-6 py-3.5 rounded-xl shadow-sm mb-6 text-sm flex items-center gap-2">
+        ✨ {{ message }}
     </div>
+    {% endfor %}
+{% else %}
+    <div class="w-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium px-6 py-3.5 rounded-xl shadow-sm mb-6 text-sm flex items-center gap-2">
+        🟢 ระบบจัดการข้อมูลกำลังพลพร้อมใช้งาน (ล็อกอินในชื่อ: {{ request.user.username }})
+    </div>
+{% endif %}
 
-    <form method="GET" action="{% url 'manage_users' %}" style="background: #f9fafb; padding: 15px; border-radius: 10px; display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-        <input type="text" name="search" value="{{ search_query }}" placeholder="🔍 ค้นหาด้วยชื่อ หรือ Username..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; outline: none;">
-        
-        <select name="company_filter" onchange="this.form.submit()" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; background: white;">
-            <option value="">📂 กองร้อยทั้งหมด</option>
-            {% for key, val in company_choices %}
-                <option value="{{ key }}" {% if filter_company == key %}selected{% endif %}>{{ val }}</option>
-            {% endfor %}
-        </select>
-        
-        <button type="submit" style="background: #374151; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer;">ค้นหา</button>
-        <a href="{% url 'manage_users' %}" style="background: #e5e7eb; color: #374151; text-decoration: none; padding: 10px 15px; border-radius: 8px; text-align: center;">ล้างค่า</a>
-    </form>
+<div class="min-h-screen bg-slate-50 p-2 md:p-4 font-sans text-slate-700">
 
-    <div style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 15px;">
-            <thead>
-                <tr style="background: #1f2937; color: white;">
-                    <th style="padding: 12px;">Username</th>
-                    <th style="padding: 12px;">ชื่อ-นามสกุล</th>
-                    <th style="padding: 12px;">เบอร์โทร</th>
-                    <th style="padding: 12px;">กองร้อย</th>
-                    <th style="padding: 12px;">สถานะ</th>
-                    <th style="padding: 12px;">กำหนดกลับ</th>
-                    <th style="padding: 12px; text-align: center;">จัดการ</th>
-                </tr>
-            </thead>
-            <tbody style="color: #374151;">
-                {% for u in users %}
-                <tr style="border-bottom: 1px solid #e5e7eb;">
-                    <td style="padding: 12px; font-weight: bold; color: #2563eb;">{{ u.username }}</td>
-                    <td style="padding: 12px;">{{ u.first_name }} {{ u.last_name }}</td>
-                    <td style="padding: 12px;">{{ u.userprofile.phone_number|default:"-" }}</td>
-                    <td style="padding: 12px;">{{ u.userprofile.get_company_display|default:"-" }}</td>
-                    <td style="padding: 12px;">
-                        {% if u.userprofile.status == 'normal' %}<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:20px; font-size:12px;">ปกติ</span>
-                        {% elif u.userprofile.status == 'leave' %}<span style="background:#fef3c7; color:#92400e; padding:4px 8px; border-radius:20px; font-size:12px;">ลาพัก</span>
-                        {% elif u.userprofile.status == 'official' %}<span style="background:#dbeafe; color:#1d4ed8; padding:4px 8px; border-radius:20px; font-size:12px;">ไปราชการ</span>
-                        {% elif u.userprofile.status == 'home' %}<span style="background:#f3e8ff; color:#6b21a8; padding:4px 8px; border-radius:20px; font-size:12px;">กลับบ้าน</span>
-                        {% endif %}
-                    </td>
-                    <td style="padding: 12px; color: #6b7280;">{{ u.userprofile.return_date|date:"d/m/Y"|default:"-" }}</td>
-                    <td style="padding: 12px; text-align: center;">
-                        <button onclick="openEditModal('{{ u.id }}', '{{ u.first_name }}', '{{ u.last_name }}', '{{ u.userprofile.phone_number }}', '{{ u.userprofile.company }}', '{{ u.userprofile.status }}', '{{ u.userprofile.return_date|date:'Y-m-d' }}')" style="background: #f59e0b; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-right: 4px;">✏️ แก้ไข</button>
-                        <a href="{% url 'delete_user_admin' u.id %}" onclick="return confirm('ยืนยันลบกำลังพลคนนี้ออกจากระบบ?')" style="background: #ef4444; color: white; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 13px;">🗑️ ลบ</a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="7" style="padding: 30px; text-align: center; color: #9ca3af;">❌ ไม่พบข้อมูลรายชื่อกำลังพล</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8 max-w-7xl mx-auto">
+        
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+            <div class="flex items-start gap-3">
+                <span class="text-3xl mt-1">🪖</span>
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-800 tracking-tight">
+                        ระบบจัดการข้อมูลกำลังพล
+                    </h1>
+                    <p class="text-slate-400 text-xs mt-1 font-normal">
+                        เพิ่ม ลบ ค้นหา และปรับปรุงสถานะการปฏิบัติหน้าที่
+                    </p>
+                </div>
+            </div>
+
+            <button onclick="toggleAdd(true)"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm shadow-sm transition flex items-center gap-2 self-start md:self-auto">
+                <span>➕</span> เพิ่มกำลังพลใหม่
+            </button>
+        </div>
+
+        <form method="GET" class="flex flex-col md:flex-row gap-3 mb-6">
+            <div class="relative flex-1">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 text-sm">🔍</span>
+                <input type="text" name="search" value="{{ search_query }}"
+                    placeholder="ค้นหาด้วยชื่อ หรือ Username..."
+                    class="w-full pl-10 pr-4 py-2.5 bg-white text-slate-700 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500 text-sm transition">
+            </div>
+
+            <div class="w-full md:w-56">
+                <select name="company_filter" onchange="this.form.submit()"
+                    class="w-full px-4 py-2.5 bg-white text-slate-600 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500 text-sm transition appearance-none cursor-pointer" 
+                    style="background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"292.4\" height=\"292.4\" viewBox=\"0 0 292.4 292.4\"><path fill=\"%23a0aec0\" d=\"M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z\"/></svg>'); background-repeat: no-repeat; background-position: right 1rem top 50%; background-size: 0.65rem auto;">
+                    <option value="">📁 กองร้อยทั้งหมด</option>
+                    {% for key, val in company_choices %}
+                        <option value="{{ key }}" {% if filter_company == key %}selected{% endif %}>
+                            {{ val }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex gap-2">
+                <button class="bg-slate-800 hover:bg-slate-950 text-white px-6 py-2.5 rounded-xl font-medium text-sm transition shadow-sm flex-1 md:flex-none">
+                    ค้นหา
+                </button>
+
+                <a href="{% url 'manage_users' %}"
+                    class="bg-slate-100 hover:bg-slate-200 text-slate-500 px-5 py-2.5 rounded-xl font-medium text-sm transition text-center flex-1 md:flex-none">
+                    ล้างค่า
+                </a>
+            </div>
+        </form>
+
+        <div class="overflow-x-auto border border-slate-100 rounded-xl shadow-sm">
+            <table class="w-full text-sm border-collapse bg-white">
+                <thead>
+                    <tr class="bg-[#1e293b] text-white text-xs font-bold tracking-wide border-b border-slate-700">
+                        <th class="px-6 py-4 text-left">Username</th>
+                        <th class="px-6 py-4 text-left">ชื่อ-นามสกุล</th>
+                        <th class="px-6 py-4 text-left">เบอร์โทร</th>
+                        <th class="px-6 py-4 text-left">กองร้อย</th>
+                        <th class="px-6 py-4 text-left">สถานะ</th>
+                        <th class="px-6 py-4 text-left">กำหนดกลับ</th>
+                        <th class="px-6 py-4 text-center">จัดการ</th>
+                    </tr>
+                </thead>
+
+                <tbody class="divide-y divide-slate-100 text-slate-600 font-normal">
+                    {% for u in users %}
+                    <tr class="hover:bg-slate-50/50 transition">
+
+                        <td class="px-6 py-4 font-bold text-blue-600">
+                            {{ u.username }}
+                        </td>
+
+                        <td class="px-6 py-4 text-slate-800 font-medium">
+                            {{ u.first_name }} {{ u.last_name }}
+                        </td>
+
+                        <td class="px-6 py-4 text-slate-400">
+                            {{ u.profile.phone_number|default:"-" }}
+                        </td>
+
+                        <td class="px-6 py-4 text-slate-400">
+                            {{ u.profile.get_company_display|default:"-" }}
+                        </td>
+
+                        <td class="px-6 py-4 text-slate-400">
+                            {% if u.profile.person_status == 'normal' %}
+                                <span class="text-emerald-600 font-medium">ปกติ</span>
+                            {% elif u.profile.person_status == 'leave' %}
+                                <span class="text-amber-500 font-medium">ลา</span>
+                            {% elif u.profile.person_status == 'official' %}
+                                <span class="text-blue-500 font-medium">ราชการ</span>
+                            {% else %}
+                                <span class="text-slate-400">-</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-6 py-4 text-slate-400">
+                            {{ u.profile.return_date|date:"d/m/Y"|default:"-" }}
+                        </td>
+
+                        <td class="px-6 py-4">
+                            <div class="flex items-center justify-center gap-2">
+                                <button
+                                    onclick="openEdit(
+                                        '{{ u.id }}',
+                                        '{{ u.first_name }}',
+                                        '{{ u.last_name }}',
+                                        '{{ u.profile.phone_number }}',
+                                        '{{ u.profile.company }}',
+                                        '{{ u.profile.person_status }}',
+                                        '{{ u.profile.return_date|date:'Y-m-d' }}'
+                                    )"
+                                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#f59e0b] hover:bg-amber-600 text-white font-medium text-xs transition shadow-sm">
+                                    ✏️ แก้ไข
+                                </button>
+
+                                <a href="{% url 'delete_user_admin' u.id %}"
+                                   onclick="return confirm('ยืนยันลบข้อมูลกำลังพลท่านนี้?')"
+                                   class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#ef4444] hover:bg-red-600 text-white font-medium text-xs transition shadow-sm">
+                                    🗑 ลบ
+                                </a>
+                            </div>
+                        </td>
+
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center text-slate-400 font-normal">
+                            📭 ไม่พบรายชื่อข้อมูลกำลังพลในระบบ
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
     </div>
 </div>
 
-<div id="add-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; padding: 15px;">
-    <div style="background: white; padding: 25px; border-radius: 12px; max-width: 400px; w-full: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
-        <h3 style="margin-bottom: 15px; color: #111827;">➕ ลงทะเบียนกำลังพลใหม่</h3>
-        <form method="POST" action="{% url 'add_user_admin' %}" style="display: flex; flex-direction: column; gap: 12px;">
+<div id="addModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                <span>➕</span> เพิ่มกำลังพลใหม่
+            </h2>
+            <button onclick="toggleAdd(false)" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+        </div>
+
+        <form method="POST" action="{% url 'add_user_admin' %}" class="p-6 space-y-4">
             {% csrf_token %}
-            <input type="text" name="username" placeholder="Username สำหรับเข้าสู่ระบบ" required style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-            <input type="text" name="first_name" placeholder="ชื่อจริง" required style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-            <input type="text" name="last_name" placeholder="นามสกุล" required style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-            <input type="text" name="phone_number" placeholder="เบอร์โทรศัพท์" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-            <select name="company" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                {% for key, val in company_choices %} <option value="{{ key }}">{{ val }}</option> {% endfor %}
-            </select>
-            <input type="password" name="password" placeholder="รหัสผ่านเริ่มต้น (ถ้าว่างไว้จะเป็น 123456)" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                <button type="button" onclick="document.getElementById('add-modal').style.display='none'" style="background: #e5e7eb; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer;">ยกเลิก</button>
-                <button type="submit" style="background: #2563eb; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer;">บันทึก</button>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Username</label>
+                <input name="username" placeholder="ระบุ Username" required class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">ชื่อ</label>
+                    <input name="first_name" placeholder="ชื่อ" required class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">นามสกุล</label>
+                    <input name="last_name" placeholder="นามสกุล" required class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">เบอร์โทรศัพท์</label>
+                <input name="phone_number" placeholder="เบอร์โทรศัพท์" class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">สังกัดกองร้อย</label>
+                <select name="company" class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none bg-white">
+                    {% for key, val in company_choices %}
+                        <option value="{{ key }}">{{ val }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 mt-4">
+                <button type="button" onclick="toggleAdd(false)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 font-medium text-sm rounded-xl transition">ปิด</button>
+                <button class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-xl shadow-sm transition">บันทึก</button>
             </div>
         </form>
     </div>
 </div>
 
-<div id="edit-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; padding: 15px;">
-    <div style="background: white; padding: 25px; border-radius: 12px; max-width: 400px; w-full: 100%;">
-        <h3 style="margin-bottom: 15px; color: #111827;">✏️ แก้ไขข้อมูลรายบุคคล</h3>
-        <form id="edit-form" method="POST" action="" style="display: flex; flex-direction: column; gap: 12px;">
+<div id="editModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                <span>✏️</span> แก้ไขข้อมูลกำลังพล
+            </h2>
+            <button onclick="toggleEdit(false)" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+        </div>
+
+        <form id="editForm" method="POST" class="p-6 space-y-4">
             {% csrf_token %}
-            <input type="text" id="edit_first_name" name="first_name" placeholder="ชื่อจริง" required style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-            <input type="text" id="edit_last_name" name="last_name" placeholder="นามสกุล" required style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-            <input type="text" id="edit_phone_number" name="phone_number" placeholder="เบอร์โทรศัพท์" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-            <select id="edit_company" name="company" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                {% for key, val in company_choices %} <option value="{{ key }}">{{ val }}</option> {% endfor %}
-            </select>
-            <select id="edit_status" name="status" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                {% for key, val in status_choices %} <option value="{{ key }}">{{ val }}</option> {% endfor %}
-            </select>
-            <div>
-                <label style="font-size: 12px; font-weight: bold; color: #4b5563; display: block; margin-bottom: 4px;">วันที่กำหนดกลับกรม</label>
-                <input type="date" id="edit_return_date" name="return_date" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%;">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">ชื่อ</label>
+                    <input id="fn" name="first_name" required class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">นามสกุล</label>
+                    <input id="ln" name="last_name" required class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500">
+                </div>
             </div>
-            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                <button type="button" onclick="document.getElementById('edit-modal').style.display='none'" style="background: #e5e7eb; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer;">ยกเลิก</button>
-                <button type="submit" style="background: #f59e0b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer;">อัปเดต</button>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">เบอร์โทรศัพท์</label>
+                <input id="ph" name="phone_number" class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">กำหนดวันกลับเข้ากรม</label>
+                <input id="rd" type="date" name="return_date" class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-600">
+            </div>
+            <div class="flex justify-end gap-2 pt-2 mt-4">
+                <button type="button" onclick="toggleEdit(false)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 font-medium text-sm rounded-xl transition">ปิด</button>
+                <button class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-medium text-sm rounded-xl shadow-sm transition">อัปเดต</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-    function openEditModal(id, firstName, lastName, phone, company, status, returnDate) {
-        document.getElementById('edit-form').action = `/manage-users/edit/${id}/`;
-        document.getElementById('edit_first_name').value = firstName;
-        document.getElementById('edit_last_name').value = lastName;
-        document.getElementById('edit_phone_number').value = phone === 'None' ? '' : phone;
-        document.getElementById('edit_company').value = company;
-        document.getElementById('edit_status').value = status;
-        document.getElementById('edit_return_date').value = returnDate === 'None' ? '' : returnDate;
-        document.getElementById('edit-modal').style.display = 'flex';
-    }
+function toggleAdd(v){
+    document.getElementById('addModal').classList.toggle('hidden', !v);
+}
+
+function toggleEdit(v){
+    document.getElementById('editModal').classList.toggle('hidden', !v);
+}
+
+function openEdit(id, fn, ln, ph, company, status, rd){
+    document.getElementById('editForm').action = `/manage-users/edit/${id}/`;
+    document.getElementById('fn').value = fn;
+    document.getElementById('ln').value = ln;
+    document.getElementById('ph').value = ph;
+    document.getElementById('rd').value = rd;
+
+    toggleEdit(true);
+}
 </script>
+
 {% endblock %}

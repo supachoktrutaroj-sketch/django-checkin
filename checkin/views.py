@@ -223,7 +223,8 @@ def build_line_summary_message(trigger_record=None):
     if not_checkedin_users.exists():
         lines.append("รายชื่อคนที่ยังไม่มา / ยังไม่เช็คอิน:")
         for i, user in enumerate(not_checkedin_users, start=1):
-            profile = getattr(user, 'userprofile', None)
+            # 🛠️ แก้ไขจุดนี้: เปลี่ยนจาก 'userprofile' -> 'profile' ให้ถูกต้องตามโมเดล
+            profile = getattr(user, 'profile', None)
             phone = profile.phone_number if profile and profile.phone_number else "-"
             full_name = f"{user.first_name} {user.last_name}".strip() or user.username
 
@@ -389,7 +390,22 @@ def home(request):
 @login_required
 def dashboard(request):
     today = timezone.localdate()
-    data = CheckInRecord.objects.filter(user=request.user).select_related('user').order_by('-created_at')
+    raw_data = CheckInRecord.objects.filter(user=request.user).select_related('user').order_by('-created_at')
+    
+    for item in raw_data:
+        if item.action == 'checkin':
+            item.action_badge = "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+            item.action_icon = "fa-sign-in-alt"
+        else:
+            item.action_badge = "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-300"
+            item.action_icon = "fa-sign-out-alt"
+            
+        if item.status == 'present':
+            item.status_badge = "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+        elif item.status == 'late':
+            item.status_badge = "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
+        else:
+            item.status_badge = "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
 
     today_records = CheckInRecord.objects.filter(created_at__date=today)
     total_checkin = today_records.filter(action='checkin').count()
@@ -411,7 +427,7 @@ def dashboard(request):
     labels = [str(item['created_at__date']) for item in daily_stats]
     values = [item['total'] for item in daily_stats]
 
-    status_labels = ['มาปกติ', 'มาสาย']
+    status_labels = ['มาปกติ (คน)', 'มาสาย (คน)']
     status_values = [
         today_records.filter(action='checkin', status='present').count(),
         today_records.filter(action='checkin', status='late').count(),
@@ -420,7 +436,7 @@ def dashboard(request):
     returned_users, not_returned_users = get_return_status_summary()
 
     context = {
-        'data': data,
+        'data': raw_data,
         'total_checkin': total_checkin,
         'late_count': late_count,
         'checkout_count': checkout_count,
@@ -438,6 +454,11 @@ def dashboard(request):
 @login_required
 def history_view(request):
     data = CheckInRecord.objects.filter(user=request.user).select_related('user').order_by('-created_at')
+    
+    for item in data:
+        item.badge_class = "bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full" if item.action == 'checkin' else "bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded-full"
+        item.status_class = "bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded" if item.status == 'present' else "bg-amber-100 text-amber-800 text-xs font-medium px-2.5 py-0.5 rounded"
+        
     return render(request, 'history.html', {'data': data})
 
 
@@ -564,13 +585,12 @@ def face_verify_page(request):
 
 @login_required
 def checkin_view(request):
-    """ หน้าเช็คอินและบันทึกประิกัด GPS """
-    office_lat = 13.878779447272407
-    office_lon = 100.5912086091356
+    """ หน้าเช็คอินและบันทึกพิกัด GPS """
+    office_lat = 13.819810075005167
+    office_lon = 100.52961418065506
     allowed_radius = 600
     location_name = "จุดบริการกำลังพล"
     
-    # ดึงข้อมูลมาแสดงผลในหน้าเช็คชื่อปกติ
     context = {
         'office_lat': office_lat,
         'office_lon': office_lon,
@@ -587,14 +607,12 @@ def checkin_view(request):
 @login_required
 @user_passes_test(is_admin_or_staff, login_url='dashboard')
 def admin_dashboard(request):
-    """ ตัวอย่างฟังก์ชันสำหรับหน้าภาพรวม Admin Dashboard """
     return render(request, 'admin_dashboard.html')
 
 
 @login_required
 @user_passes_test(is_admin_or_staff, login_url='dashboard')
 def time_settings_view(request):
-    """ ตัวอย่างฟังก์ชันสำหรับตั้งค่าเวลาของระบบ """
     return render(request, 'time_settings.html')
 
 
@@ -617,7 +635,11 @@ def manage_users_view(request):
     company_choices = UserProfile.COMPANY_CHOICES if hasattr(UserProfile, 'COMPANY_CHOICES') else []
     status_choices = UserProfile.STATUS_CHOICES if hasattr(UserProfile, 'STATUS_CHOICES') else []
 
-    users_queryset = User.objects.filter(is_superuser=False, is_staff=False).select_related('userprofile')
+    # 🛠️ แก้ไขจุดล่ม: เปลี่ยนชื่อใน select_related() ให้เป็น 'profile' และ 'face_profile' ตามที่ระบบมีอยู่จริง
+    users_queryset = User.objects.filter(
+        is_superuser=False,
+        is_staff=False
+    ).select_related('profile', 'face_profile')
 
     # ระบบค้นหา (Search)
     search_query = request.GET.get('search', '').strip()
@@ -631,7 +653,20 @@ def manage_users_view(request):
     # ระบบกรองกองร้อย (Filter)
     filter_company = request.GET.get('company_filter', '').strip()
     if filter_company:
-        users_queryset = users_queryset.filter(userprofile__company=filter_company)
+        # 🛠️ แก้ไขจุดนี้ด้วย: เปลี่ยน 'userprofile__company' เป็น 'profile__company'
+        users_queryset = users_queryset.filter(profile__company=filter_company)
+
+    # ตกแต่ง Badge สำหรับผู้ใช้แต่ละคนในการจัดการฝั่งแอดมิน
+    for user in users_queryset:
+        prof = getattr(user, 'profile', None)  # 🛠️ แก้ไขจุดนี้ด้วย: เปลี่ยนจาก 'userprofile' เป็น 'profile'
+        status = prof.person_status if prof else 'normal'
+        
+        if status == 'normal':
+            user.status_ui = "bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold"
+        elif status == 'leave':
+            user.status_ui = "bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold"
+        else:
+            user.status_ui = "bg-rose-100 text-rose-800 px-2 py-1 rounded text-xs font-semibold"
 
     context = {
         'users': users_queryset,
@@ -647,7 +682,6 @@ def manage_users_view(request):
 @user_passes_test(is_admin_or_staff, login_url='dashboard')
 @require_POST
 def add_user_admin(request):
-    """ ระบบเพิ่มกำลังพลคนใหม่จากหน้าต่างแอดมิน """
     username = request.POST.get('username', '').strip()
     first_name = request.POST.get('first_name', '').strip()
     last_name = request.POST.get('last_name', '').strip()
@@ -664,13 +698,10 @@ def add_user_admin(request):
         return redirect('manage_users')
 
     user = User.objects.create_user(username=username, password=password, first_name=first_name, last_name=last_name)
-    UserProfile.objects.create(user=user, phone_number=phone_number, company=company, status='normal')
+    UserProfile.objects.create(user=user, phone_number=phone_number, company=company, person_status='normal')
     
     try:
-        from django.apps import apps
-        if apps.has_model('checkin', 'UserFaceProfile'):
-            UserFaceProfileModel = apps.get_model('checkin', 'UserFaceProfile')
-            UserFaceProfileModel.objects.get_or_create(user=user)
+        UserFaceProfile.objects.get_or_create(user=user)
     except Exception:
         pass
 
@@ -682,7 +713,6 @@ def add_user_admin(request):
 @user_passes_test(is_admin_or_staff, login_url='dashboard')
 @require_POST
 def edit_user_admin(request, user_id):
-    """ ระบบแก้ไขข้อมูลรายบุคคล (กองร้อย, สถานะ, กำหนดกลับ) """
     target_user = get_object_or_404(User, id=user_id)
     profile, _ = UserProfile.objects.get_or_create(user=target_user)
 
@@ -692,7 +722,7 @@ def edit_user_admin(request, user_id):
 
     profile.phone_number = request.POST.get('phone_number', '').strip()
     profile.company = request.POST.get('company', '').strip()
-    profile.status = request.POST.get('status', 'normal').strip()
+    profile.person_status = request.POST.get('status', 'normal').strip()
     
     return_date_val = request.POST.get('return_date', '').strip()
     profile.return_date = return_date_val if return_date_val else None
@@ -705,9 +735,9 @@ def edit_user_admin(request, user_id):
 @login_required
 @user_passes_test(is_admin_or_staff, login_url='dashboard')
 def delete_user_admin(request, user_id):
-    """ ระบบลบกำลังพลออกจากฐานข้อมูล """
     target_user = get_object_or_404(User, id=user_id)
     username = target_user.username
     target_user.delete()
     
-    messages
+    messages.success(request, f'ลบกำลังพล {username} ออกจากระบบแล้ว')
+    return redirect('manage_users')
