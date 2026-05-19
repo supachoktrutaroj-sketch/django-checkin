@@ -229,6 +229,7 @@ def build_line_summary_message(trigger_record=None):
 
     return "\n".join(lines)
 
+
 def send_line_push_message(message_text):
     channel_access_token = getattr(settings, 'LINE_CHANNEL_ACCESS_TOKEN', '').strip()
     target_id = getattr(settings, 'LINE_TARGET_ID', '').strip()
@@ -365,6 +366,10 @@ def login_view(request):
         if user is not None:
             login(request, user)
 
+            # [แก้ไข] หากเป็น Superuser ไม่บังคับสแกนหน้า ให้ข้ามไปที่หน้าแดชบอร์ดเลย
+            if user.is_superuser:
+                return redirect('dashboard')
+
             face_profile, _ = UserFaceProfile.objects.get_or_create(user=user)
             if not face_profile.face_descriptor:
                 messages.warning(request, 'กรุณาลงทะเบียนใบหน้าก่อนใช้งาน')
@@ -489,6 +494,11 @@ def profile_view(request):
 
 @login_required
 def face_register_page(request):
+    # [แก้ไข] หากเป็น Superuser ไม่จำเป็นต้องลงทะเบียนใบหน้า ให้ดีดไปหน้า dashboard ทันที
+    if request.user.is_superuser:
+        messages.info(request, 'สิทธิ์ Super Admin ไม่จำเป็นต้องลงทะเบียนใบหน้า')
+        return redirect('dashboard')
+
     profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
     context = {
         'has_face_registered': bool(profile.face_descriptor),
@@ -499,6 +509,14 @@ def face_register_page(request):
 @login_required
 @require_POST
 def save_face_descriptor(request):
+    # [แก้ไข] บล็อก API ฝั่งหลังบ้านไม่ให้บันทึกข้อมูลหากเป็นบัญชี Superuser
+    if request.user.is_superuser:
+        return JsonResponse({
+            'success': False,
+            'message': 'สิทธิ์ Super Admin ไม่จำเป็นต้องลงทะเบียนใบหน้า',
+            'error': 'สิทธิ์ Super Admin ไม่จำเป็นต้องลงทะเบียนใบหน้า'
+        }, status=400)
+
     try:
         data = json.loads(request.body.decode('utf-8'))
         descriptor = data.get('descriptor')
@@ -566,6 +584,11 @@ def save_face_descriptor(request):
 
 @login_required
 def face_verify_page(request):
+    # [แก้ไข] หากเข้าหน้าตรวจสอบใบหน้าตรง ๆ ด้วยบัญชี Superuser ให้ปล่อยผ่านไปแดชบอร์ดทันที
+    if request.user.is_superuser:
+        messages.info(request, 'สิทธิ์ Super Admin ไม่จำเป็นต้องสแกนใบหน้า')
+        return redirect('dashboard')
+
     profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
     has_face_registered = bool(profile.face_descriptor)
 
@@ -583,11 +606,17 @@ def checkin_view(request):
     allowed_radius = 600
     location_name = "จุดเช็คอินหลัก"
 
-    face_profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
-
-    if not face_profile.face_descriptor:
-        messages.warning(request, 'กรุณาลงทะเบียนใบหน้าก่อนเช็คอิน')
-        return redirect('face_register')
+    # [แก้ไข] จัดการสิทธิ์ Superuser ไม่ให้ติดเงื่อนไขบังคับสแกนหน้า โดยจะ mock ข้อมูลส่งไปหน้าบ้านแทน
+    if request.user.is_superuser:
+        has_face_registered = True
+        saved_descriptor = '[]'
+    else:
+        face_profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
+        if not face_profile.face_descriptor:
+            messages.warning(request, 'กรุณาลงทะเบียนใบหน้าก่อนเช็คอิน')
+            return redirect('face_register')
+        has_face_registered = bool(face_profile.face_descriptor)
+        saved_descriptor = face_profile.face_descriptor
 
     context = {
         'office_lat': office_lat,
@@ -595,8 +624,8 @@ def checkin_view(request):
         'allowed_radius': allowed_radius,
         'location_name': location_name,
         'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY,
-        'has_face_registered': bool(face_profile.face_descriptor),
-        'saved_descriptor': face_profile.face_descriptor if face_profile.face_descriptor else '[]',
+        'has_face_registered': has_face_registered,
+        'saved_descriptor': saved_descriptor,
     }
 
     if request.method == 'POST':
