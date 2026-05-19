@@ -3,24 +3,20 @@ import json
 import math
 import urllib.request
 import urllib.error
+from datetime import time, datetime
 
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.contrib import messages
 from django.views.decorators.http import require_POST
-from datetime import time
-
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from django.contrib import messages
 from django.contrib.auth.models import User
-from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
 from django.conf import settings
 from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
 
 import openpyxl
 
@@ -54,11 +50,6 @@ def calculate_face_distance(desc1, desc2):
 
 
 def get_pdf_font():
-    """
-    โหลดฟอนต์ไทยสำหรับ PDF
-    ต้องมีไฟล์ฟอนต์อยู่ที่:
-    checkin/static/fonts/THSarabunNew.ttf
-    """
     font_path = os.path.join(
         settings.BASE_DIR,
         'checkin',
@@ -66,7 +57,6 @@ def get_pdf_font():
         'fonts',
         'THSarabunNew.ttf'
     )
-
     try:
         pdfmetrics.registerFont(TTFont("ThaiFont", font_path))
         return "ThaiFont"
@@ -84,13 +74,13 @@ def line_webhook(request):
         except Exception as e:
             print("LINE WEBHOOK ERROR:", str(e))
         return JsonResponse({'status': 'ok'})
-
     return JsonResponse({'message': 'ok'})
 
 
 def get_system_setting():
     setting = SystemSetting.objects.first()
     if not setting:
+        # กำหนดค่าเริ่มต้นเป็นวัตถุ time หรือสตริงให้สอดคล้องกับ Model ฟิลด์
         setting = SystemSetting.objects.create(
             checkin_start_time='08:00',
             late_time='08:30',
@@ -101,7 +91,6 @@ def get_system_setting():
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     r = 6371000
-
     phi1 = math.radians(float(lat1))
     phi2 = math.radians(float(lat2))
     dphi = math.radians(float(lat2) - float(lat1))
@@ -109,19 +98,26 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
     return r * c
 
 
 def calculate_status(checkin_datetime):
     setting = get_system_setting()
     local_time = timezone.localtime(checkin_datetime).time()
-    return "late" if local_time > setting.late_time else "present"
+    
+    # ป้องกัน TypeError: เปรียบเทียบ time object กับ string
+    late_time_setting = setting.late_time
+    if isinstance(late_time_setting, str):
+        try:
+            late_time_setting = datetime.strptime(late_time_setting, '%H:%M').time()
+        except ValueError:
+            late_time_setting = datetime.strptime(late_time_setting, '%H:%M:%S').time()
+            
+    return "late" if local_time > late_time_setting else "present"
 
 
 def get_return_status_summary():
     today = timezone.localdate()
-
     today_records = (
         CheckInRecord.objects
         .filter(created_at__date=today)
@@ -151,14 +147,21 @@ def build_line_summary_message(trigger_record=None):
     now_local = timezone.localtime()
     system_setting = get_system_setting()
 
+    # จัดการกรณีข้อมูลในดีบีเป็นสตริงหรือไทม์อ็อบเจกต์
+    deadline_setting = system_setting.return_deadline
+    if isinstance(deadline_setting, str):
+        dt_parsed = datetime.strptime(deadline_setting, '%H:%M')
+        deadline_hour, deadline_minute = dt_parsed.hour, dt_parsed.minute
+    else:
+        deadline_hour, deadline_minute = deadline_setting.hour, deadline_setting.minute
+
     deadline = now_local.replace(
-        hour=system_setting.return_deadline.hour,
-        minute=system_setting.return_deadline.minute,
+        hour=deadline_hour,
+        minute=deadline_minute,
         second=0,
         microsecond=0,
     )
 
-    # ใช้เฉพาะผู้ใช้จริงเท่านั้น ไม่เอา admin / staff / superuser / user ที่ปิดใช้งาน
     real_users = User.objects.filter(
         is_superuser=False,
         is_staff=False,
@@ -186,12 +189,9 @@ def build_line_summary_message(trigger_record=None):
         .exclude(id__in=checked_in_user_ids_set)
         .order_by('username')
     )
-
     not_checked_count = not_checkedin_users.count()
 
     lines = []
-
-    # ก่อนถึงเวลากำหนด: ตอนเช็คอินให้แจ้งจำนวนรวมเหมือนเดิม
     if now_local <= deadline:
         if trigger_record:
             action_text = 'เช็คอินแล้ว' if trigger_record.action == 'checkin' else 'เช็คเอาต์แล้ว'
@@ -204,10 +204,8 @@ def build_line_summary_message(trigger_record=None):
         lines.append(f"✅ เช็คอินแล้ว: {checked_count} คน")
         lines.append(f"⏳ ยังไม่มา: {not_checked_count} คน")
         lines.append(f"⏰ เวลากำหนด: {deadline.strftime('%H:%M')} น.")
-
         return "\n".join(lines)
 
-    # หลังเลยเวลากำหนด: แจ้งรายชื่อคนที่ยังไม่มา พร้อมเบอร์โทร
     lines.append("🚨 เลยเวลากลับเข้ากรมแล้ว")
     lines.append(f"เวลากำหนด: {deadline.strftime('%H:%M')} น.")
     lines.append(f"เวลาอัปเดต: {now_local.strftime('%H:%M:%S')}")
@@ -221,10 +219,7 @@ def build_line_summary_message(trigger_record=None):
         for i, user in enumerate(not_checkedin_users, start=1):
             profile = getattr(user, 'userprofile', None)
             phone = profile.phone_number if profile and profile.phone_number else "-"
-
-            full_name = f"{user.first_name} {user.last_name}".strip()
-            if not full_name:
-                full_name = user.username
+            full_name = f"{user.first_name} {user.last_name}".strip() or user.username
 
             lines.append(f"{i}. {full_name}")
             lines.append(f"   เบอร์โทร: {phone}")
@@ -278,10 +273,8 @@ def notify_line_return_status(trigger_record=None):
         return False, "duplicate skipped"
 
     ok, result = send_line_push_message(message_text)
-
     if ok:
         cache.set(cache_key, True, timeout=60)
-
     return ok, result
 
 
@@ -306,15 +299,7 @@ def register_view(request):
             'company': company,
         }
 
-        if (
-            not first_name or
-            not last_name or
-            not username or
-            not phone_number or
-            not company or
-            not password1 or
-            not password2
-        ):
+        if not all([first_name, last_name, username, phone_number, company, password1, password2]):
             context['error'] = 'กรุณากรอกข้อมูลให้ครบทุกช่อง'
             return render(request, 'register.html', context)
 
@@ -336,22 +321,15 @@ def register_view(request):
             first_name=first_name,
             last_name=last_name,
         )
-
         UserProfile.objects.create(
             user=user,
             phone_number=phone_number,
             company=company,
         )
-
         UserFaceProfile.objects.get_or_create(user=user)
 
         login(request, user)
-
-        messages.success(
-            request,
-            'สมัครสมาชิกสำเร็จ กรุณาลงทะเบียนใบหน้าก่อนใช้งาน'
-        )
-
+        messages.success(request, 'สมัครสมาชิกสำเร็จ กรุณาลงทะเบียนใบหน้าก่อนใช้งาน')
         return redirect('face_register')
 
     return render(request, 'register.html')
@@ -364,13 +342,10 @@ def login_view(request):
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
-
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
             login(request, user)
-
-            # [แก้ไข] หากเป็น Superuser ไม่บังคับสแกนหน้า ให้ข้ามไปที่หน้าแดชบอร์ดเลย
             if user.is_superuser:
                 return redirect('dashboard')
 
@@ -384,7 +359,6 @@ def login_view(request):
         return render(request, 'login.html', {
             'error': 'Username หรือ Password ไม่ถูกต้อง'
         })
-
     return render(request, 'login.html')
 
 
@@ -401,7 +375,6 @@ def home(request):
 @login_required
 def dashboard(request):
     today = timezone.localdate()
-
     data = CheckInRecord.objects.filter(user=request.user).select_related('user').order_by('-created_at')
 
     today_records = CheckInRecord.objects.filter(created_at__date=today)
@@ -425,9 +398,10 @@ def dashboard(request):
     values = [item['total'] for item in daily_stats]
 
     status_labels = ['มาปกติ', 'มาสาย']
+    # [แก้ไขประสิทธิภาพ] กรองนับจำนวนเฉพาะวันนี้ ไม่คิวรีข้อมูลทั้งหมดในอดีตลงมานับ
     status_values = [
-        CheckInRecord.objects.filter(action='checkin', status='present').count(),
-        CheckInRecord.objects.filter(action='checkin', status='late').count(),
+        today_records.filter(action='checkin', status='present').count(),
+        today_records.filter(action='checkin', status='late').count(),
     ]
 
     returned_users, not_returned_users = get_return_status_summary()
@@ -445,18 +419,12 @@ def dashboard(request):
         'returned_count': len(returned_users),
         'not_returned_count': len(not_returned_users),
     }
-
     return render(request, 'dashboard.html', context)
 
 
 @login_required
 def history_view(request):
-    data = (
-        CheckInRecord.objects
-        .filter(user=request.user)
-        .select_related('user')
-        .order_by('-created_at')
-    )
+    data = CheckInRecord.objects.filter(user=request.user).select_related('user').order_by('-created_at')
     return render(request, 'history.html', {'data': data})
 
 
@@ -465,24 +433,12 @@ def profile_view(request):
     user = request.user
     profile, _ = UserProfile.objects.get_or_create(user=user)
 
-    latest_record = (
-        CheckInRecord.objects
-        .filter(user=user)
-        .select_related('user')
-        .order_by('-created_at')
-        .first()
-    )
-
+    latest_record = CheckInRecord.objects.filter(user=user).select_related('user').order_by('-created_at').first()
     total_checkin = CheckInRecord.objects.filter(user=user, action='checkin').count()
     total_checkout = CheckInRecord.objects.filter(user=user, action='checkout').count()
 
     today = timezone.localdate()
-    today_record = (
-        CheckInRecord.objects
-        .filter(user=user, created_at__date=today)
-        .order_by('-created_at')
-        .first()
-    )
+    today_record = CheckInRecord.objects.filter(user=user, created_at__date=today).order_by('-created_at').first()
 
     context = {
         'profile_user': user,
@@ -492,13 +448,11 @@ def profile_view(request):
         'total_checkout': total_checkout,
         'today_record': today_record,
     }
-
     return render(request, 'profile.html', context)
 
 
 @login_required
 def face_register_page(request):
-    # [แก้ไข] หากเป็น Superuser ไม่จำเป็นต้องลงทะเบียนใบหน้า ให้ดีดไปหน้า dashboard ทันที
     if request.user.is_superuser:
         messages.info(request, 'สิทธิ์ Super Admin ไม่จำเป็นต้องลงทะเบียนใบหน้า')
         return redirect('dashboard')
@@ -513,7 +467,6 @@ def face_register_page(request):
 @login_required
 @require_POST
 def save_face_descriptor(request):
-    # [แก้ไข] บล็อก API ฝั่งหลังบ้านไม่ให้บันทึกข้อมูลหากเป็นบัญชี Superuser
     if request.user.is_superuser:
         return JsonResponse({
             'success': False,
@@ -533,7 +486,6 @@ def save_face_descriptor(request):
             }, status=400)
 
         profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
-
         if profile.face_descriptor:
             return JsonResponse({
                 'success': False,
@@ -553,19 +505,16 @@ def save_face_descriptor(request):
         for other_profile in other_profiles:
             try:
                 old_descriptor = json.loads(other_profile.face_descriptor)
-
                 if not is_valid_face_descriptor(old_descriptor):
                     continue
 
                 distance = calculate_face_distance(descriptor, old_descriptor)
-
                 if distance < duplicate_threshold:
                     return JsonResponse({
                         'success': False,
                         'message': 'ใบหน้านี้ถูกลงทะเบียนกับบัญชีอื่นแล้ว ไม่สามารถใช้ซ้ำได้',
                         'error': 'ใบหน้านี้ถูกลงทะเบียนกับบัญชีอื่นแล้ว ไม่สามารถใช้ซ้ำได้'
                     }, status=400)
-
             except Exception:
                 continue
 
@@ -573,31 +522,20 @@ def save_face_descriptor(request):
         profile.face_registered_at = timezone.now()
         profile.save()
 
-        return JsonResponse({
-            'success': True,
-            'message': 'บันทึกใบหน้าเรียบร้อยแล้ว'
-        })
-
+        return JsonResponse({'success': True, 'message': 'บันทึกใบหน้าเรียบร้อยแล้ว'})
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': str(e),
-            'error': str(e)
-        }, status=400)
+        return JsonResponse({'success': False, 'message': str(e), 'error': str(e)}, status=400)
 
 
 @login_required
 def face_verify_page(request):
-    # [แก้ไข] หากเข้าหน้าตรวจสอบใบหน้าตรง ๆ ด้วยบัญชี Superuser ให้ปล่อยผ่านไปแดชบอร์ดทันที
     if request.user.is_superuser:
         messages.info(request, 'สิทธิ์ Super Admin ไม่จำเป็นต้องสแกนใบหน้า')
         return redirect('dashboard')
 
     profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
-    has_face_registered = bool(profile.face_descriptor)
-
     context = {
-        'has_face_registered': has_face_registered,
+        'has_face_registered': bool(profile.face_descriptor),
         'saved_descriptor': profile.face_descriptor if profile.face_descriptor else '[]',
     }
     return render(request, 'face_verify.html', context)
@@ -608,376 +546,4 @@ def checkin_view(request):
     office_lat = 13.878779447272407
     office_lon = 100.5912086091356
     allowed_radius = 600
-    location_name = "จุดเช็คอินหลัก"
-
-    # [แก้ไข] จัดการสิทธิ์ Superuser ไม่ให้ติดเงื่อนไขบังคับสแกนหน้า โดยจะ mock ข้อมูลส่งไปหน้าบ้านแทน
-    if request.user.is_superuser:
-        has_face_registered = True
-        saved_descriptor = '[]'
-    else:
-        face_profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
-        if not face_profile.face_descriptor:
-            messages.warning(request, 'กรุณาลงทะเบียนใบหน้าก่อนเช็คอิน')
-            return redirect('face_register')
-        has_face_registered = bool(face_profile.face_descriptor)
-        saved_descriptor = face_profile.face_descriptor
-
-    context = {
-        'office_lat': office_lat,
-        'office_lon': office_lon,
-        'allowed_radius': allowed_radius,
-        'location_name': location_name,
-        'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY,
-        'has_face_registered': has_face_registered,
-        'saved_descriptor': saved_descriptor,
-    }
-
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        lat = request.POST.get('latitude')
-        lon = request.POST.get('longitude')
-
-        if action not in ['checkin', 'checkout']:
-            context['error'] = 'รูปแบบการทำรายการไม่ถูกต้อง'
-            return render(request, 'checkin.html', context)
-
-        if not lat or not lon:
-            context['error'] = 'กรุณาเปิด GPS ก่อนดำเนินการ'
-            return render(request, 'checkin.html', context)
-
-        try:
-            lat = float(lat)
-            lon = float(lon)
-        except ValueError:
-            context['error'] = 'ข้อมูลพิกัดไม่ถูกต้อง'
-            return render(request, 'checkin.html', context)
-
-        distance = calculate_distance(lat, lon, office_lat, office_lon)
-
-        if distance > allowed_radius:
-            context['error'] = f'❌ อยู่นอกพื้นที่ ({int(distance)} เมตร)'
-            return render(request, 'checkin.html', context)
-
-        now = timezone.now()
-        today = timezone.localdate()
-
-        if action == 'checkin':
-            already_checked_in = CheckInRecord.objects.filter(
-                user=request.user,
-                action='checkin',
-                created_at__date=today
-            ).exists()
-
-            if already_checked_in:
-                context['error'] = '❗ วันนี้คุณเช็คอินแล้ว'
-                return render(request, 'checkin.html', context)
-
-            record = CheckInRecord.objects.create(
-                user=request.user,
-                action='checkin',
-                latitude=lat,
-                longitude=lon,
-                distance=distance,
-                status=calculate_status(now),
-            )
-
-            ok, result = notify_line_return_status(trigger_record=record)
-            print("LINE PUSH CHECKIN:", ok, result)
-
-            messages.success(request, '✅ เช็คอินสำเร็จ')
-            return redirect('dashboard')
-
-        today_checkin = CheckInRecord.objects.filter(
-            user=request.user,
-            action='checkin',
-            created_at__date=today
-        ).exists()
-
-        today_checkout = CheckInRecord.objects.filter(
-            user=request.user,
-            action='checkout',
-            created_at__date=today
-        ).exists()
-
-        if not today_checkin:
-            context['error'] = '❗ กรุณาเช็คอินก่อนเช็คเอาต์'
-            return render(request, 'checkin.html', context)
-
-        if today_checkout:
-            context['error'] = '❗ วันนี้คุณเช็คเอาต์แล้ว'
-            return render(request, 'checkin.html', context)
-
-        record = CheckInRecord.objects.create(
-            user=request.user,
-            action='checkout',
-            latitude=lat,
-            longitude=lon,
-            distance=distance,
-            status='present',
-        )
-
-        ok, result = notify_line_return_status(trigger_record=record)
-        print("LINE PUSH CHECKOUT:", ok, result)
-
-        messages.success(request, '✅ เช็คเอาต์สำเร็จ')
-        return redirect('dashboard')
-
-    return render(request, 'checkin.html', context)
-
-
-@login_required
-def time_settings_view(request):
-    if not request.user.is_staff:
-        messages.error(request, 'คุณไม่มีสิทธิ์เข้าใช้งานหน้านี้')
-        return redirect('dashboard')
-
-    setting = get_system_setting()
-
-    if request.method == 'POST':
-        checkin_start_time = request.POST.get('checkin_start_time')
-        late_time = request.POST.get('late_time')
-        return_deadline = request.POST.get('return_deadline')
-
-        if not checkin_start_time or not late_time or not return_deadline:
-            messages.error(request, 'กรุณากรอกเวลาให้ครบทุกช่อง')
-            return render(request, 'time_settings.html', {'setting': setting})
-
-        setting.checkin_start_time = checkin_start_time
-        setting.late_time = late_time
-        setting.return_deadline = return_deadline
-        setting.save()
-
-        messages.success(request, 'บันทึกการตั้งค่าเวลาเรียบร้อยแล้ว')
-        return redirect('time_settings')
-
-    return render(request, 'time_settings.html', {'setting': setting})
-
-
-@login_required
-def admin_dashboard(request):
-    if not request.user.is_staff:
-        messages.error(request, 'คุณไม่มีสิทธิ์เข้าใช้งานหน้านี้')
-        return redirect('dashboard')
-
-    today = timezone.localdate()
-    system_setting = get_system_setting()
-
-    checked_in_user_ids = (
-        CheckInRecord.objects
-        .filter(action='checkin', created_at__date=today)
-        .values_list('user_id', flat=True)
-        .distinct()
-    )
-
-    not_checkedin_users = (
-        User.objects
-        .filter(is_superuser=False, is_staff=False, is_active=True)
-        .exclude(id__in=checked_in_user_ids)
-        .order_by('username')
-    )
-
-    now_local = timezone.localtime()
-    deadline = now_local.replace(
-        hour=system_setting.return_deadline.hour,
-        minute=system_setting.return_deadline.minute,
-        second=0,
-        microsecond=0,
-    )
-
-    context = {
-        'not_checkedin_users': not_checkedin_users,
-        'system_setting': system_setting,
-        'return_deadline': deadline.strftime('%H:%M'),
-    }
-
-    return render(request, 'admin_dashboard.html', context)
-
-
-@login_required
-def export_excel(request):
-    if not request.user.is_staff:
-        return redirect('dashboard')
-
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Attendance Report"
-
-    ws.append([
-        'ชื่อผู้ใช้',
-        'ชื่อ-นามสกุล',
-        'เบอร์โทร',
-        'วันที่',
-        'เวลา',
-        'ประเภท',
-        'ละติจูด',
-        'ลองจิจูด',
-        'ระยะทาง (เมตร)',
-        'สถานะ'
-    ])
-
-    records = CheckInRecord.objects.select_related('user').all().order_by('-created_at')
-
-    for r in records:
-        local_dt = timezone.localtime(r.created_at)
-        action_text = "เข้างาน" if r.action == "checkin" else "ออกงาน"
-        status_text = "มาสาย" if r.status == "late" else "ปกติ"
-
-        full_name = f"{r.user.first_name} {r.user.last_name}".strip() or "-"
-        profile = getattr(r.user, 'userprofile', None)
-        phone_number = profile.phone_number if profile and profile.phone_number else "-"
-
-        ws.append([
-            r.user.username,
-            full_name,
-            phone_number,
-            local_dt.strftime('%d/%m/%Y'),
-            local_dt.strftime('%H:%M:%S'),
-            action_text,
-            r.latitude,
-            r.longitude,
-            round(r.distance, 2),
-            status_text,
-        ])
-
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response['Content-Disposition'] = 'attachment; filename=attendance.xlsx'
-
-    wb.save(response)
-    return response
-
-
-@login_required
-def export_pdf(request):
-    if not request.user.is_staff:
-        return redirect('dashboard')
-
-    font_name = get_pdf_font()
-    today = timezone.localdate()
-
-    checked_in_user_ids = (
-        CheckInRecord.objects
-        .filter(action='checkin', created_at__date=today)
-        .values_list('user_id', flat=True)
-        .distinct()
-    )
-
-    not_checkedin_users = (
-        User.objects
-        .filter(is_superuser=False, is_staff=False, is_active=True)
-        .exclude(id__in=checked_in_user_ids)
-        .order_by('username')
-    )
-
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename=not_checkedin_report.pdf'
-
-    doc = SimpleDocTemplate(
-        response,
-        pagesize=landscape(A4),
-        rightMargin=1 * cm,
-        leftMargin=1 * cm,
-        topMargin=1 * cm,
-        bottomMargin=1 * cm,
-    )
-
-    elements = []
-    styles = getSampleStyleSheet()
-
-    title_style = ParagraphStyle(
-        'ThaiTitle',
-        parent=styles['Title'],
-        fontName=font_name,
-        fontSize=24,
-        leading=28,
-        alignment=1,
-        textColor=colors.HexColor('#0f172a'),
-        spaceAfter=8,
-    )
-
-    subtitle_style = ParagraphStyle(
-        'ThaiSubtitle',
-        parent=styles['Normal'],
-        fontName=font_name,
-        fontSize=13,
-        leading=16,
-        alignment=1,
-        textColor=colors.HexColor('#475569'),
-        spaceAfter=16,
-    )
-
-    generated_at = timezone.localtime().strftime('%d/%m/%Y %H:%M:%S')
-
-    elements.append(Paragraph("รายงานรายชื่อผู้ที่ยังไม่มา / ยังไม่เช็คอิน", title_style))
-    elements.append(Paragraph(f"วันที่ออกรายงาน: {generated_at}", subtitle_style))
-    elements.append(Spacer(1, 10))
-
-    data = [[
-        'ลำดับ',
-        'ชื่อผู้ใช้',
-        'ชื่อ',
-        'นามสกุล',
-        'เบอร์โทร',
-        'สถานะ',
-    ]]
-
-    for index, user in enumerate(not_checkedin_users, start=1):
-        profile = getattr(user, 'userprofile', None)
-        phone_number = profile.phone_number if profile and profile.phone_number else "-"
-
-        data.append([
-            str(index),
-            user.username,
-            user.first_name or "-",
-            user.last_name or "-",
-            phone_number,
-            "ยังไม่เช็คอิน",
-        ])
-
-    if len(data) == 1:
-        data.append(['-', '-', '-', '-', '-', 'ทุกคนเช็คอินแล้ว'])
-
-    table = Table(
-        data,
-        repeatRows=1,
-        colWidths=[
-            2 * cm,
-            5 * cm,
-            5 * cm,
-            5 * cm,
-            4 * cm,
-            5 * cm,
-        ],
-    )
-
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), font_name),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
-
-        ('FONTNAME', (0, 1), (-1, -1), font_name),
-        ('FONTSIZE', (0, 1), (-1, -1), 11),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#111827')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [
-            colors.white,
-            colors.HexColor('#f8fafc')
-        ]),
-
-        ('TOPPADDING', (0, 0), (-1, -1), 9),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 9),
-        ('LEFTPADDING', (0, 0), (-1, -1), 6),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-    ]))
-
-    elements.append(table)
-    doc.build(elements)
-
-    return response
+    location_name = "จุดเช็คอิน

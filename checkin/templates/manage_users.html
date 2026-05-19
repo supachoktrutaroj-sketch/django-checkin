@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+        <div>
+            <h2 style="font-size: 22px; color: #1f2937;">🪖 ระบบจัดการข้อมูลกำลังพล</h2>
+            <p style="font-size: 14px; color: #6b7280; margin-top: 4px;">เพิ่ม ลบ ค้นหา และปรับปรุงสถานะการปฏิบัติหน้าที่</p>
+        </div>
+        <button onclick="document.getElementById('add-modal').style.display='flex'" style="background: #2563eb; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;">
+            ➕ เพิ่มกำลังพลใหม่
+        </button>
+    </div>
+
+    <form method="GET" action="{% url 'manage_users' %}" style="background: #f9fafb; padding: 15px; border-radius: 10px; display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+        <input type="text" name="search" value="{{ search_query }}" placeholder="🔍 ค้นหาด้วยชื่อ หรือ Username..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; outline: none;">
+        
+        <select name="company_filter" onchange="this.form.submit()" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; background: white;">
+            <option value="">📂 กองร้อยทั้งหมด</option>
+            {% for key, val in company_choices %}
+                <option value="{{ key }}" {% if filter_company == key %}selected{% endif %}>{{ val }}</option>
+            {% endfor %}
+        </select>
+        
+        <button type="submit" style="background: #374151; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer;">ค้นหา</button>
+        <a href="{% url 'manage_users' %}" style="background: #e5e7eb; color: #374151; text-decoration: none; padding: 10px 15px; border-radius: 8px; text-align: center;">ล้างค่า</a>
+    </form>
+
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 15px;">
+            <thead>
+                <tr style="background: #1f2937; color: white;">
+                    <th style="padding: 12px;">Username</th>
+                    <th style="padding: 12px;">ชื่อ-นามสกุล</th>
+                    <th style="padding: 12px;">เบอร์โทร</th>
+                    <th style="padding: 12px;">กองร้อย</th>
+                    <th style="padding: 12px;">สถานะ</th>
+                    <th style="padding: 12px;">กำหนดกลับ</th>
+                    <th style="padding: 12px; text-align: center;">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody style="color: #374151;">
+                {% for u in users %}
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                    <td style="padding: 12px; font-weight: bold; color: #2563eb;">{{ u.username }}</td>
+                    <td style="padding: 12px;">{{ u.first_name }} {{ u.last_name }}</td>
+                    <td style="padding: 12px;">{{ u.userprofile.phone_number|default:"-" }}</td>
+                    <td style="padding: 12px;">{{ u.userprofile.get_company_display|default:"-" }}</td>
+                    <td style="padding: 12px;">
+                        {% if u.userprofile.status == 'normal' %}<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:20px; font-size:12px;">ปกติ</span>
+                        {% elif u.userprofile.status == 'leave' %}<span style="background:#fef3c7; color:#92400e; padding:4px 8px; border-radius:20px; font-size:12px;">ลาพัก</span>
+                        {% elif u.userprofile.status == 'official' %}<span style="background:#dbeafe; color:#1d4ed8; padding:4px 8px; border-radius:20px; font-size:12px;">ไปราชการ</span>
+                        {% elif u.userprofile.status == 'home' %}<span style="background:#f3e8ff; color:#6b21a8; padding:4px 8px; border-radius:20px; font-size:12px;">กลับบ้าน</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 12px; color: #6b7280;">{{ u.userprofile.return_date|date:"d/m/Y"|default:"-" }}</td>
+                    <td style="padding: 12px; text-align: center;">
+                        <button onclick="openEditModal('{{ u.id }}', '{{ u.first_name }}', '{{ u.last_name }}', '{{ u.userprofile.phone_number }}', '{{ u.userprofile.company }}', '{{ u.userprofile.status }}', '{{ u.userprofile.return_date|date:'Y-m-d' }}')" style="background: #f59e0b; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-right: 4px;">✏️ แก้ไข</button>
+                        <a href="{% url 'delete_user_admin' u.id %}" onclick="return confirm('ยืนยันลบกำลังพลคนนี้ออกจากระบบ?')" style="background: #ef4444; color: white; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 13px;">🗑️ ลบ</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="padding: 30px; text-align: center; color: #9ca3af;">❌ ไม่พบข้อมูลรายชื่อกำลังพล</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="add-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; padding: 15px;">
+    <div style="background: white; padding: 25px; border-radius: 12px; max-width: 400px; w-full: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+        <h3 style="margin-bottom: 15px; color: #111827;">➕ ลงทะเบียนกำลังพลใหม่</h3>
+        <form method="POST" action="{% url 'add_user_admin' %}" style="display: flex; flex-direction: column; gap: 12px;">
+            {% csrf_token %}
+            <input type="text" name="username" placeholder="Username สำหรับเข้าสู่ระบบ" required style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            <input type="text" name="first_name" placeholder="ชื่อจริง" required style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            <input type="text" name="last_name" placeholder="นามสกุล" required style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            <input type="text" name="phone_number" placeholder="เบอร์โทรศัพท์" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            <select name="company" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                {% for key, val in company_choices %} <option value="{{ key }}">{{ val }}</option> {% endfor %}
+            </select>
+            <input type="password" name="password" placeholder="รหัสผ่านเริ่มต้น (ถ้าว่างไว้จะเป็น 123456)" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                <button type="button" onclick="document.getElementById('add-modal').style.display='none'" style="background: #e5e7eb; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer;">ยกเลิก</button>
+                <button type="submit" style="background: #2563eb; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer;">บันทึก</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="edit-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; padding: 15px;">
+    <div style="background: white; padding: 25px; border-radius: 12px; max-width: 400px; w-full: 100%;">
+        <h3 style="margin-bottom: 15px; color: #111827;">✏️ แก้ไขข้อมูลรายบุคคล</h3>
+        <form id="edit-form" method="POST" action="" style="display: flex; flex-direction: column; gap: 12px;">
+            {% csrf_token %}
+            <input type="text" id="edit_first_name" name="first_name" placeholder="ชื่อจริง" required style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            <input type="text" id="edit_last_name" name="last_name" placeholder="นามสกุล" required style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            <input type="text" id="edit_phone_number" name="phone_number" placeholder="เบอร์โทรศัพท์" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            <select id="edit_company" name="company" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                {% for key, val in company_choices %} <option value="{{ key }}">{{ val }}</option> {% endfor %}
+            </select>
+            <select id="edit_status" name="status" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                {% for key, val in status_choices %} <option value="{{ key }}">{{ val }}</option> {% endfor %}
+            </select>
+            <div>
+                <label style="font-size: 12px; font-weight: bold; color: #4b5563; display: block; margin-bottom: 4px;">วันที่กำหนดกลับกรม</label>
+                <input type="date" id="edit_return_date" name="return_date" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%;">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                <button type="button" onclick="document.getElementById('edit-modal').style.display='none'" style="background: #e5e7eb; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer;">ยกเลิก</button>
+                <button type="submit" style="background: #f59e0b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer;">อัปเดต</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openEditModal(id, firstName, lastName, phone, company, status, returnDate) {
+        document.getElementById('edit-form').action = `/manage-users/edit/${id}/`;
+        document.getElementById('edit_first_name').value = firstName;
+        document.getElementById('edit_last_name').value = lastName;
+        document.getElementById('edit_phone_number').value = phone === 'None' ? '' : phone;
+        document.getElementById('edit_company').value = company;
+        document.getElementById('edit_status').value = status;
+        document.getElementById('edit_return_date').value = returnDate === 'None' ? '' : returnDate;
+        document.getElementById('edit-modal').style.display = 'flex';
+    }
+</script>
+{% endblock %}
