@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 
 
 class CheckInRecord(models.Model):
+
     ACTION_CHOICES = [
         ('checkin', 'Check In'),
         ('checkout', 'Check Out'),
@@ -13,12 +14,23 @@ class CheckInRecord(models.Model):
         ('late', 'Late'),
     ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE
+    )
+
+    action = models.CharField(
+        max_length=10,
+        choices=ACTION_CHOICES
+    )
 
     latitude = models.FloatField()
+
     longitude = models.FloatField()
-    distance = models.FloatField(default=0)
+
+    distance = models.FloatField(
+        default=0
+    )
 
     status = models.CharField(
         max_length=10,
@@ -26,18 +38,32 @@ class CheckInRecord(models.Model):
         default='present'
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True
+    )
 
     def __str__(self):
         return f"{self.user.username} - {self.action} - {self.created_at:%Y-%m-%d %H:%M:%S}"
 
 
 class SystemSetting(models.Model):
-    checkin_start_time = models.TimeField(default='08:00')
-    late_time = models.TimeField(default='08:30')
-    return_deadline = models.TimeField(default='18:00')
 
-    updated_at = models.DateTimeField(auto_now=True)
+    checkin_start_time = models.TimeField(
+        default="08:00"
+    )
+
+    late_time = models.TimeField(
+        default="08:30"
+    )
+
+    return_deadline = models.TimeField(
+        default="18:00"
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
 
     def __str__(self):
         return "System Setting"
@@ -55,6 +81,13 @@ class UserProfile(models.Model):
         ('3', 'กองร้อย 3'),
         ('4', 'กองร้อย 4'),
         ('5', 'กองร้อยสนับสนุน'),
+    ]
+
+    PERSON_STATUS_CHOICES = [
+        ('normal', 'ปกติ'),
+        ('leave', 'ลาพัก'),
+        ('mission', 'ไปราชการ'),
+        ('home', 'กลับบ้าน'),
     ]
 
     user = models.OneToOneField(
@@ -75,11 +108,51 @@ class UserProfile(models.Model):
         default='1'
     )
 
+    person_status = models.CharField(
+        max_length=20,
+        choices=PERSON_STATUS_CHOICES,
+        default='normal'
+    )
+
+    return_date = models.DateField(
+        blank=True,
+        null=True
+    )
+
+    note = models.TextField(
+        blank=True,
+        null=True
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True
+    )
+
     def get_company_display_thai(self):
         return dict(self.COMPANY_CHOICES).get(self.company)
 
+    def get_status_display_thai(self):
+        return dict(self.PERSON_STATUS_CHOICES).get(self.person_status)
+
+    def is_returned(self):
+        return self.person_status == 'home'
+
+    def is_on_leave(self):
+        return self.person_status == 'leave'
+
+    def is_on_mission(self):
+        return self.person_status == 'mission'
+
+    def is_normal(self):
+        return self.person_status == 'normal'
+
+    @property
+    def full_name(self):
+        return f"{self.user.first_name} {self.user.last_name}"
+
     def __str__(self):
-        return f"{self.user.username} - {self.get_company_display_thai()}"
+        return f"{self.full_name} ({self.get_company_display_thai()})"
 
 
 class UserFaceProfile(models.Model):
@@ -99,6 +172,14 @@ class UserFaceProfile(models.Model):
         blank=True,
         null=True
     )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True
+    )
+
+    def has_face_registered(self):
+        return bool(self.face_descriptor)
 
     def __str__(self):
         return f"FaceProfile({self.user.username})"

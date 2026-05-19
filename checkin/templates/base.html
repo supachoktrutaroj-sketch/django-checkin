@@ -156,19 +156,20 @@
             <div class="menu-group">
                 <div class="menu-title">เมนูผู้ใช้</div>
 
-                <a href="{% url 'dashboard' %}">📊 Dashboard ผู้ใช้</a>
-                <a href="{% url 'profile' %}">👤 ข้อมูลส่วนตัว</a>
-                <a href="{% url 'checkin' %}">📍 เช็คอิน / เช็คเอาต์</a>
-                <a href="{% url 'history' %}">📜 ประวัติการเช็คอิน</a>
+                <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">📊 Dashboard ผู้ใช้</a>
+                <a href="{% url 'profile' %}" class="{% if request.resolver_match.url_name == 'profile' %}active{% endif %}">👤 ข้อมูลส่วนตัว</a>
+                <a href="{% url 'checkin' %}" class="{% if request.resolver_match.url_name == 'checkin' %}active{% endif %}">📍 เช็คอิน / เช็คเอาต์</a>
+                <a href="{% url 'history' %}" class="{% if request.resolver_match.url_name == 'history' %}active{% endif %}">📜 ประวัติการเช็คอิน</a>
             </div>
 
             {% if request.user.is_staff %}
             <div class="menu-group">
                 <div class="menu-title">เมนูผู้ดูแล</div>
 
-                <a href="{% url 'admin_dashboard' %}">🛠️ Admin Dashboard</a>
-                <a href="{% url 'time_settings' %}">⏰ ตั้งค่าเวลา</a>
-                <a href="{% url 'export_pdf' %}">📄 Export PDF</a>
+                <a href="{% url 'admin_dashboard' %}" class="{% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">🛠️ Admin Dashboard</a>
+                <a href="{% url 'time_settings' %}" class="{% if request.resolver_match.url_name == 'time_settings' %}active{% endif %}">⏰ ตั้งค่าเวลา</a>
+                <a href="{% url 'export_pdf' %}" class="{% if request.resolver_match.url_name == 'export_pdf' %}active{% endif %}">📄 Export PDF</a>
+                <a href="{% url 'manage_users' %}" class="{% if request.resolver_match.url_name == 'manage_users' %}active{% endif %}">🪖 จัดการกำลังพล</a>
                 <a href="/admin/">⚙️ Django Admin</a>
             </div>
             {% endif %}
