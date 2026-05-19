@@ -8,9 +8,9 @@ from datetime import time, datetime
 from django.db.models import Q, Count
 from django.contrib import messages
 from django.views.decorators.http import require_POST
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.http import HttpResponse, JsonResponse
@@ -29,6 +29,15 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 from .models import CheckInRecord, SystemSetting, UserFaceProfile, UserProfile
+
+
+# ====================================================
+#  ระบบตรวจสอบสิทธิ์และฟังก์ชันตัวช่วย (Helpers)
+# ====================================================
+
+def is_admin_or_staff(user):
+    """ ตรวจสอบว่าผู้ใช้มีสิทธิ์ของแอดมินหรือเจ้าหน้าที่หรือไม่ """
+    return user.is_authenticated and (user.is_staff or user.is_superuser)
 
 
 def is_valid_face_descriptor(descriptor):
@@ -80,7 +89,6 @@ def line_webhook(request):
 def get_system_setting():
     setting = SystemSetting.objects.first()
     if not setting:
-        # กำหนดค่าเริ่มต้นเป็นวัตถุ time หรือสตริงให้สอดคล้องกับ Model ฟิลด์
         setting = SystemSetting.objects.create(
             checkin_start_time='08:00',
             late_time='08:30',
@@ -105,7 +113,6 @@ def calculate_status(checkin_datetime):
     setting = get_system_setting()
     local_time = timezone.localtime(checkin_datetime).time()
     
-    # ป้องกัน TypeError: เปรียบเทียบ time object กับ string
     late_time_setting = setting.late_time
     if isinstance(late_time_setting, str):
         try:
@@ -147,7 +154,6 @@ def build_line_summary_message(trigger_record=None):
     now_local = timezone.localtime()
     system_setting = get_system_setting()
 
-    # จัดการกรณีข้อมูลในดีบีเป็นสตริงหรือไทม์อ็อบเจกต์
     deadline_setting = system_setting.return_deadline
     if isinstance(deadline_setting, str):
         dt_parsed = datetime.strptime(deadline_setting, '%H:%M')
@@ -278,6 +284,10 @@ def notify_line_return_status(trigger_record=None):
     return ok, result
 
 
+# ====================================================
+#  ระบบลงทะเบียนและเข้าสู่ระบบ (Authentication)
+# ====================================================
+
 def register_view(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
@@ -372,6 +382,10 @@ def home(request):
     return redirect('dashboard')
 
 
+# ====================================================
+#  ระบบแสดงผล Dashboard และประวัติ (User Side)
+# ====================================================
+
 @login_required
 def dashboard(request):
     today = timezone.localdate()
@@ -398,7 +412,6 @@ def dashboard(request):
     values = [item['total'] for item in daily_stats]
 
     status_labels = ['มาปกติ', 'มาสาย']
-    # [แก้ไขประสิทธิภาพ] กรองนับจำนวนเฉพาะวันนี้ ไม่คิวรีข้อมูลทั้งหมดในอดีตลงมานับ
     status_values = [
         today_records.filter(action='checkin', status='present').count(),
         today_records.filter(action='checkin', status='late').count(),
@@ -450,6 +463,10 @@ def profile_view(request):
     }
     return render(request, 'profile.html', context)
 
+
+# ====================================================
+#  ระบบจัดการและตรวจจับใบหน้า (Face Recognition)
+# ====================================================
 
 @login_required
 def face_register_page(request):
@@ -541,9 +558,156 @@ def face_verify_page(request):
     return render(request, 'face_verify.html', context)
 
 
+# ====================================================
+#  ระบบเช็คอิน / เช็คเอาต์ และตำแหน่งที่ตั้ง (GPS Check-In)
+# ====================================================
+
 @login_required
 def checkin_view(request):
+    """ หน้าเช็คอินและบันทึกประิกัด GPS """
     office_lat = 13.878779447272407
     office_lon = 100.5912086091356
     allowed_radius = 600
-    location_name = "จุดเช็คอิน
+    location_name = "จุดบริการกำลังพล"
+    
+    # ดึงข้อมูลมาแสดงผลในหน้าเช็คชื่อปกติ
+    context = {
+        'office_lat': office_lat,
+        'office_lon': office_lon,
+        'allowed_radius': allowed_radius,
+        'location_name': location_name
+    }
+    return render(request, 'checkin.html', context)
+
+
+# ====================================================
+#  ⚙️ เมนูแอดมิน: ระบบจัดการข้อมูลกำลังพล (Personnel Management)
+# ====================================================
+
+@login_required
+@user_passes_test(is_admin_or_staff, login_url='dashboard')
+def admin_dashboard(request):
+    """ ตัวอย่างฟังก์ชันสำหรับหน้าภาพรวม Admin Dashboard """
+    return render(request, 'admin_dashboard.html')
+
+
+@login_required
+@user_passes_test(is_admin_or_staff, login_url='dashboard')
+def time_settings_view(request):
+    """ ตัวอย่างฟังก์ชันสำหรับตั้งค่าเวลาของระบบ """
+    return render(request, 'time_settings.html')
+
+
+@login_required
+@user_passes_test(is_admin_or_staff, login_url='dashboard')
+def export_excel(request):
+    return HttpResponse("Export Excel")
+
+
+@login_required
+@user_passes_test(is_admin_or_staff, login_url='dashboard')
+def export_pdf(request):
+    return HttpResponse("Export PDF")
+
+
+@login_required
+@user_passes_test(is_admin_or_staff, login_url='dashboard')
+def manage_users_view(request):
+    """ หน้าแสดงรายชื่อ ค้นหา Filter และจัดการสถานะกำลังพลทั้งหมด """
+    company_choices = UserProfile.COMPANY_CHOICES if hasattr(UserProfile, 'COMPANY_CHOICES') else []
+    status_choices = UserProfile.STATUS_CHOICES if hasattr(UserProfile, 'STATUS_CHOICES') else []
+
+    users_queryset = User.objects.filter(is_superuser=False, is_staff=False).select_related('userprofile')
+
+    # ระบบค้นหา (Search)
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        users_queryset = users_queryset.filter(
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query)
+        )
+
+    # ระบบกรองกองร้อย (Filter)
+    filter_company = request.GET.get('company_filter', '').strip()
+    if filter_company:
+        users_queryset = users_queryset.filter(userprofile__company=filter_company)
+
+    context = {
+        'users': users_queryset,
+        'company_choices': company_choices,
+        'status_choices': status_choices,
+        'search_query': search_query,
+        'filter_company': filter_company,
+    }
+    return render(request, 'manage_users.html', context)
+
+
+@login_required
+@user_passes_test(is_admin_or_staff, login_url='dashboard')
+@require_POST
+def add_user_admin(request):
+    """ ระบบเพิ่มกำลังพลคนใหม่จากหน้าต่างแอดมิน """
+    username = request.POST.get('username', '').strip()
+    first_name = request.POST.get('first_name', '').strip()
+    last_name = request.POST.get('last_name', '').strip()
+    phone_number = request.POST.get('phone_number', '').strip()
+    company = request.POST.get('company', '').strip()
+    password = request.POST.get('password', '').strip() or '123456'
+
+    if not username or not first_name or not last_name:
+        messages.error(request, 'กรุณากรอก Username และ ชื่อ-นามสกุล')
+        return redirect('manage_users')
+
+    if User.objects.filter(username=username).exists():
+        messages.error(request, f'Username "{username}" มีอยู่ในระบบแล้ว')
+        return redirect('manage_users')
+
+    user = User.objects.create_user(username=username, password=password, first_name=first_name, last_name=last_name)
+    UserProfile.objects.create(user=user, phone_number=phone_number, company=company, status='normal')
+    
+    try:
+        from django.apps import apps
+        if apps.has_model('checkin', 'UserFaceProfile'):
+            UserFaceProfileModel = apps.get_model('checkin', 'UserFaceProfile')
+            UserFaceProfileModel.objects.get_or_create(user=user)
+    except Exception:
+        pass
+
+    messages.success(request, f'เพิ่มกำลังพล {first_name} สำเร็จเรียบร้อย')
+    return redirect('manage_users')
+
+
+@login_required
+@user_passes_test(is_admin_or_staff, login_url='dashboard')
+@require_POST
+def edit_user_admin(request, user_id):
+    """ ระบบแก้ไขข้อมูลรายบุคคล (กองร้อย, สถานะ, กำหนดกลับ) """
+    target_user = get_object_or_404(User, id=user_id)
+    profile, _ = UserProfile.objects.get_or_create(user=target_user)
+
+    target_user.first_name = request.POST.get('first_name', '').strip()
+    target_user.last_name = request.POST.get('last_name', '').strip()
+    target_user.save()
+
+    profile.phone_number = request.POST.get('phone_number', '').strip()
+    profile.company = request.POST.get('company', '').strip()
+    profile.status = request.POST.get('status', 'normal').strip()
+    
+    return_date_val = request.POST.get('return_date', '').strip()
+    profile.return_date = return_date_val if return_date_val else None
+    profile.save()
+
+    messages.success(request, f'อัปเดตข้อมูลของ {target_user.username} แล้ว')
+    return redirect('manage_users')
+
+
+@login_required
+@user_passes_test(is_admin_or_staff, login_url='dashboard')
+def delete_user_admin(request, user_id):
+    """ ระบบลบกำลังพลออกจากฐานข้อมูล """
+    target_user = get_object_or_404(User, id=user_id)
+    username = target_user.username
+    target_user.delete()
+    
+    messages
