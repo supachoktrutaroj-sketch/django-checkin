@@ -32,15 +32,25 @@
         text-align: center;
     }
 
-    .logo {
-        width: 90px;
-        height: 90px;
-        object-fit: contain;
+    /* ปรับปรุงโครงสร้างกรอบควบคุมโลโก้หน้า Login */
+    .logo-container {
+        width: 110px;
+        height: 110px;
         margin: 0 auto 15px;
-        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+
+    /* ตัดขอบภาพสี่เหลี่ยมสีเทาให้กลายเนียนเป็นวงกลมขอบขาว */
+    .logo-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
         border-radius: 50%;
-        padding: 12px;
-        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        border: 3px solid white;
     }
 
     .login-left h1 {
@@ -64,6 +74,9 @@
     .feature-list li {
         margin-bottom: 8px;
         font-size: 14px;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 8px 12px;
+        border-radius: 10px;
     }
 
     .login-right {
@@ -172,7 +185,9 @@
     <div class="login-wrapper">
 
         <div class="login-left">
-            <img src="{% static 'images/logo.png' %}" class="logo" alt="logo">
+            <div class="logo-container">
+                <img src="{% static 'images/รูปตรากรม.png' %}" alt="logo">
+            </div>
 
             <h1>ระบบเช็คชื่อ</h1>
             <p>ระบบบันทึกเวลาเข้า-ออก ด้วย GPS</p>

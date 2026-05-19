@@ -289,6 +289,7 @@ def register_view(request):
         last_name = request.POST.get('last_name', '').strip()
         username = request.POST.get('username', '').strip()
         phone_number = request.POST.get('phone_number', '').strip()
+        company = request.POST.get('company', '').strip()
         password1 = request.POST.get('password1', '')
         password2 = request.POST.get('password2', '')
 
@@ -297,9 +298,18 @@ def register_view(request):
             'last_name': last_name,
             'username': username,
             'phone_number': phone_number,
+            'company': company,
         }
 
-        if not first_name or not last_name or not username or not phone_number or not password1 or not password2:
+        if (
+            not first_name or
+            not last_name or
+            not username or
+            not phone_number or
+            not company or
+            not password1 or
+            not password2
+        ):
             context['error'] = 'กรุณากรอกข้อมูลให้ครบทุกช่อง'
             return render(request, 'register.html', context)
 
@@ -325,11 +335,18 @@ def register_view(request):
         UserProfile.objects.create(
             user=user,
             phone_number=phone_number,
+            company=company,
         )
 
         UserFaceProfile.objects.get_or_create(user=user)
+
         login(request, user)
-        messages.success(request, 'สมัครสมาชิกสำเร็จ กรุณาลงทะเบียนใบหน้าก่อนใช้งาน')
+
+        messages.success(
+            request,
+            'สมัครสมาชิกสำเร็จ กรุณาลงทะเบียนใบหน้าก่อนใช้งาน'
+        )
+
         return redirect('face_register')
 
     return render(request, 'register.html')
