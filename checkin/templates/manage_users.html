@@ -37,6 +37,52 @@
             </button>
         </div>
 
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+            
+            <a href="{% url 'list_in_camp' %}" class="block group">
+                <div class="bg-[#1e293b] rounded-2xl p-5 text-white shadow-md border border-slate-700 hover:border-blue-500 transition duration-300 transform group-hover:-translate-y-1">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2 text-sm font-semibold">
+                            <span>📥</span> <span>เข้ากรมแล้ว</span>
+                        </div>
+                        <span class="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-3 py-1 rounded-lg font-bold">
+                            {{ stat_in_camp|default:"0" }} นาย
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400">คลิกเพื่อดูตารางรายชื่อกำลังพลที่ปฏิบัติหน้าที่ในที่ตั้ง</p>
+                </div>
+            </a>
+
+            <a href="{% url 'list_out_camp' %}" class="block group">
+                <div class="bg-[#1e293b] rounded-2xl p-5 text-white shadow-md border border-slate-700 hover:border-amber-500 transition duration-300 transform group-hover:-translate-y-1">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2 text-sm font-semibold">
+                            <span>📤</span> <span>ออกกรม</span>
+                        </div>
+                        <span class="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1 rounded-lg font-bold">
+                            {{ stat_out_camp|default:"0" }} นาย
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400">คลิกเพื่อดูตารางรายชื่อกำลังพลที่ ลา / ไปราชการภายนอก</p>
+                </div>
+            </a>
+
+            <a href="{% url 'list_total' %}" class="block group">
+                <div class="bg-[#1e293b] rounded-2xl p-5 text-white shadow-md border border-slate-700 hover:border-emerald-500 transition duration-300 transform group-hover:-translate-y-1">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2 text-sm font-semibold">
+                            <span>👥</span> <span>ยอดคงเหลือทั้งหมด</span>
+                        </div>
+                        <span class="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-lg font-bold">
+                            {{ stat_total|default:"0" }} นาย
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400">คลิกเพื่อตรวจสอบยอดรวมและฐานข้อมูลบัญชีรายชื่อทั้งหมด</p>
+                </div>
+            </a>
+
+        </div>
+
         <form method="GET" class="flex flex-col md:flex-row gap-3 mb-6">
             <div class="relative flex-1">
                 <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 text-sm">🔍</span>
@@ -86,6 +132,7 @@
 
                 <tbody class="divide-y divide-slate-100 text-slate-600 font-normal">
                     {% for u in users %}
+                    {% if not u.is_staff %}
                     <tr class="hover:bg-slate-50/50 transition">
 
                         <td class="px-6 py-4 font-bold text-blue-600">
@@ -145,6 +192,7 @@
                         </td>
 
                     </tr>
+                    {% endif %}
                     {% empty %}
                     <tr>
                         <td colspan="7" class="px-6 py-12 text-center text-slate-400 font-normal">

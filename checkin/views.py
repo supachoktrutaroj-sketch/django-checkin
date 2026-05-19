@@ -741,3 +741,162 @@ def delete_user_admin(request, user_id):
     
     messages.success(request, f'ลบกำลังพล {username} ออกจากระบบแล้ว')
     return redirect('manage_users')
+# ====================================================================
+#  📥 ฟังก์ชันแสดงหน้าตาราง "เข้ากรมแล้ว" แบบเต็มจอ
+# ====================================================================
+def list_in_camp_view(request):
+    # ดึงข้อมูลทหารที่มีสถานะเป็น 'normal' (อยู่กรม)
+    list_in_camp = User.objects.filter(profile__person_status='normal').select_related('profile')
+    
+    context = {
+        'list_in_camp': list_in_camp,
+    }
+    return render(request, 'list_in_camp.html', context)
+
+
+# ====================================================================
+#  📤 ฟังก์ชันแสดงหน้าตาราง "ออกกรม" แบบเต็มจอ
+# ====================================================================
+def list_out_camp_view(request):
+    # ดึงข้อมูลทหารที่มีสถานะเป็น 'leave' (ลา) หรือ 'official' (ราชการ)
+    list_out_camp = User.objects.filter(profile__person_status__in=['leave', 'official']).select_related('profile')
+    
+    context = {
+        'list_out_camp': list_out_camp,
+    }
+    return render(request, 'list_out_camp.html', context)
+
+
+# ====================================================================
+#  👥 ฟังก์ชันแสดงหน้าตาราง "ยอดคงเหลือทั้งหมด" แบบเต็มจอ
+# ====================================================================
+def list_total_view(request):
+    # ดึงข้อมูลกำลังพลทั้งหมดที่มีอยู่ในระบบ
+    list_total = User.objects.all().select_related('profile')
+    
+    context = {
+        'list_total': list_total,
+    }
+    return render(request, 'list_total.html', context)
+# ====================================================================
+#  📥 ฟังก์ชันแสดงหน้าตาราง "เข้ากรมแล้ว" แบบเต็มจอ (ใส่ท้ายไฟล์ views.py)
+# ====================================================================
+def list_in_camp_view(request):
+    # ดึงข้อมูลรายชื่อคนที่อยู่กรม (normal)
+    list_in_camp = User.objects.filter(profile__person_status='normal').select_related('profile')
+    
+    # นับยอดสถิติส่งไปโชว์ที่กล่องด้านบนด้วย
+    stat_in_camp = list_in_camp.count()
+    stat_out_camp = User.objects.filter(profile__person_status__in=['leave', 'official']).count()
+    stat_total = User.objects.count()
+    
+    context = {
+        'list_in_camp': list_in_camp,
+        'stat_in_camp': stat_in_camp,
+        'stat_out_camp': stat_out_camp,
+        'stat_total': stat_total,
+    }
+    return render(request, 'list_in_camp.html', context)
+
+
+# ====================================================================
+#  📤 ฟังก์ชันแสดงหน้าตาราง "ออกกรม" แบบเต็มจอ (ใส่ท้ายไฟล์ views.py)
+# ====================================================================
+def list_out_camp_view(request):
+    # ดึงข้อมูลรายชื่อคนไม่อยู่กรม (leave, official)
+    list_out_camp = User.objects.filter(profile__person_status__in=['leave', 'official']).select_related('profile')
+    
+    # นับยอดสถิติส่งไปโชว์ที่กล่องด้านบนด้วย
+    stat_in_camp = User.objects.filter(profile__person_status='normal').count()
+    stat_out_camp = list_out_camp.count()
+    stat_total = User.objects.count()
+    
+    context = {
+        'list_out_camp': list_out_camp,
+        'stat_in_camp': stat_in_camp,
+        'stat_out_camp': stat_out_camp,
+        'stat_total': stat_total,
+    }
+    return render(request, 'list_out_camp.html', context)
+
+
+# ====================================================================
+#  👥 ฟังก์ชันแสดงหน้าตาราง "ยอดคงเหลือทั้งหมด" แบบเต็มจอ (ใส่ท้ายไฟล์ views.py)
+# ====================================================================
+def list_total_view(request):
+    # ดึงข้อมูลรายชื่อกำลังพลทั้งหมดในระบบ
+    list_total = User.objects.all().select_related('profile')
+    
+    # นับยอดสถิติส่งไปโชว์ที่กล่องด้านบนด้วย
+    stat_in_camp = User.objects.filter(profile__person_status='normal').count()
+    stat_out_camp = User.objects.filter(profile__person_status__in=['leave', 'official']).count()
+    stat_total = list_total.count()
+    
+    context = {
+        'list_total': list_total,
+        'stat_in_camp': stat_in_camp,
+        'stat_out_camp': stat_out_camp,
+        'stat_total': stat_total,
+    }
+    return render(request, 'list_total.html', context)
+# ====================================================================
+#  📥 ฟังก์ชันแสดงหน้าตาราง "เข้ากรมแล้ว" แบบเต็มจอ (แก้ไขไม่เอาแอดมิน)
+# ====================================================================
+def list_in_camp_view(request):
+    # กรองเอาเฉพาะคนที่มีสถานะปกติ (normal) และ ต้องไม่ใช่แอดมิน (is_staff=False)
+    list_in_camp = User.objects.filter(profile__person_status='normal', is_staff=False).select_related('profile')
+    
+    # คำนวณยอดสถิติด้านบนใหม่ โดยตัดแอดมินออกทั้งหมดเหมือนกัน
+    stat_in_camp = list_in_camp.count()
+    stat_out_camp = User.objects.filter(profile__person_status__in=['leave', 'official'], is_staff=False).count()
+    stat_total = User.objects.filter(is_staff=False).count()
+    
+    context = {
+        'list_in_camp': list_in_camp,
+        'stat_in_camp': stat_in_camp,
+        'stat_out_camp': stat_out_camp,
+        'stat_total': stat_total,
+    }
+    return render(request, 'list_in_camp.html', context)
+
+
+# ====================================================================
+#  📤 ฟังก์ชันแสดงหน้าตาราง "ออกกรม" แบบเต็มจอ (แก้ไขไม่เอาแอดมิน)
+# ====================================================================
+def list_out_camp_view(request):
+    # กรองเอาเฉพาะคนที่ ลา/ราชการ และ ต้องไม่ใช่แอดมิน (is_staff=False)
+    list_out_camp = User.objects.filter(profile__person_status__in=['leave', 'official'], is_staff=False).select_related('profile')
+    
+    # คำนวณยอดสถิติด้านบนใหม่ โดยตัดแอดมินออกทั้งหมดเหมือนกัน
+    stat_in_camp = User.objects.filter(profile__person_status='normal', is_staff=False).count()
+    stat_out_camp = list_out_camp.count()
+    stat_total = User.objects.filter(is_staff=False).count()
+    
+    context = {
+        'list_out_camp': list_out_camp,
+        'stat_in_camp': stat_in_camp,
+        'stat_out_camp': stat_out_camp,
+        'stat_total': stat_total,
+    }
+    return render(request, 'list_out_camp.html', context)
+
+
+# ====================================================================
+#  👥 ฟังก์ชันแสดงหน้าตาราง "ยอดคงเหลือทั้งหมด" แบบเต็มจอ (แก้ไขไม่เอาแอดมิน)
+# ====================================================================
+def list_total_view(request):
+    # ดึงกำลังพลทั้งหมดในระบบ และ ต้องไม่ใช่แอดมิน (is_staff=False)
+    list_total = User.objects.filter(is_staff=False).select_related('profile')
+    
+    # คำนวณยอดสถิติด้านบนใหม่ โดยตัดแอดมินออกทั้งหมดเหมือนกัน
+    stat_in_camp = User.objects.filter(profile__person_status='normal', is_staff=False).count()
+    stat_out_camp = User.objects.filter(profile__person_status__in=['leave', 'official'], is_staff=False).count()
+    stat_total = list_total.count()
+    
+    context = {
+        'list_total': list_total,
+        'stat_in_camp': stat_in_camp,
+        'stat_out_camp': stat_out_camp,
+        'stat_total': stat_total,
+    }
+    return render(request, 'list_total.html', context)

@@ -23,9 +23,14 @@ urlpatterns = [
     path('save-face-descriptor/', views.save_face_descriptor, name='save_face_descriptor'),
     path('face-verify/', views.face_verify_page, name='face_verify'),
 
-    # 🪖 ระบบจัดการกำลังพลสำหรับ Admin เท่านั้น (เพิ่มใหม่เข้าไปตรงนี้ครับ)
+    # 🪖 ระบบจัดการกำลังพลสำหรับ Admin เท่านั้น
     path('manage-users/', views.manage_users_view, name='manage_users'),
     path('manage-users/add/', views.add_user_admin, name='add_user_admin'),
     path('manage-users/edit/<int:user_id>/', views.edit_user_admin, name='edit_user_admin'),
     path('manage-users/delete/<int:user_id>/', views.delete_user_admin, name='delete_user_admin'),
+
+    # 📥 📤 👥 ลิงก์แยกหน้าดูรายชื่อกำลังพล 3 รูปแบบ (ที่เพิ่มเข้ามาใหม่)
+    path('manage-users/in-camp/', views.list_in_camp_view, name='list_in_camp'),
+    path('manage-users/out-camp/', views.list_out_camp_view, name='list_out_camp'),
+    path('manage-users/total/', views.list_total_view, name='list_total'),
 ]

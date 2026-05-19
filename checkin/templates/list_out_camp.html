@@ -1,0 +1,57 @@
+<script src="https://cdn.tailwindcss.com"></script>
+{% extends 'base.html' %}
+{% block content %}
+<div class="p-6 max-w-6xl mx-auto font-sans">
+    
+    <div class="mb-6 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl">📤</span>
+            <div>
+                <h1 class="text-xl font-bold text-slate-800">รายชื่อกำลังพล: ออกกรม</h1>
+                <p class="text-xs text-slate-400 mt-0.5">แสดงรายชื่อทหารที่ติดภารกิจลาพัก หรือเดินทางไปราชการภายนอก</p>
+            </div>
+        </div>
+        <a href="{% url 'manage_users' %}" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-xl transition shadow-sm flex items-center gap-1">
+            🔙 กลับหน้าจัดการหลัก
+        </a>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <table class="w-full text-sm text-left border-collapse">
+            <thead class="bg-[#1e293b] text-white text-xs font-bold tracking-wide">
+                <tr>
+                    <th class="p-4 pl-6">ชื่อ-นามสกุล</th>
+                    <th class="p-4">ประเภทการออกกรม</th>
+                    <th class="p-4">สังกัดกองร้อย</th>
+                    <th class="p-4 text-center text-amber-600">กำหนดวันกลับเข้ากรม</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-600">
+                {% for u in list_out_camp %}
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="p-4 pl-6 font-semibold text-slate-800 flex items-center gap-2">
+                        <span class="text-amber-500">🪖</span> {{ u.first_name }} {{ u.last_name }}
+                    </td>
+                    <td class="p-4">
+                        {% if u.profile.person_status == 'leave' %}
+                            <span class="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-100">📌 ลาภารกิจ</span>
+                        {% else %}
+                            <span class="px-2.5 py-1 bg-purple-50 text-purple-700 rounded-lg text-xs font-bold border border-purple-100">💼 ไปราชการ</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-4 text-slate-400">{{ u.profile.get_company_display|default:"-" }}</td>
+                    <td class="p-4 text-center font-bold text-amber-600 bg-amber-50/30">
+                        🗓 {{ u.profile.return_date|date:"d/m/Y"|default:"ยังไม่ระบุ" }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="p-12 text-center text-slate-400 italic">📭 ไม่มีข้อมูลกำลังพลในสถานะนี้</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

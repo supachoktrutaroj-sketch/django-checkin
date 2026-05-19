@@ -1,0 +1,57 @@
+<script src="https://cdn.tailwindcss.com"></script>
+{% extends 'base.html' %}
+{% block content %}
+<div class="p-6 max-w-6xl mx-auto font-sans">
+    
+    <div class="mb-6 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl">👥</span>
+            <div>
+                <h1 class="text-xl font-bold text-slate-800">รายชื่อกำลังพลทั้งหมดในระบบ</h1>
+                <p class="text-xs text-slate-400 mt-0.5">ฐานข้อมูลรวมกำลังพลทุกนายและสถานะปัจจุบัน</p>
+            </div>
+        </div>
+        <a href="{% url 'manage_users' %}" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-xl transition shadow-sm flex items-center gap-1">
+            🔙 กลับหน้าจัดการหลัก
+        </a>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <table class="w-full text-sm text-left border-collapse">
+            <thead class="bg-[#1e293b] text-white text-xs font-bold tracking-wide">
+                <tr>
+                    <th class="p-4 pl-6">Username</th>
+                    <th class="p-4">ชื่อ-นามสกุล</th>
+                    <th class="p-4">เบอร์โทรศัพท์</th>
+                    <th class="p-4">สังกัดกองร้อย</th>
+                    <th class="p-4 text-center">สถานะ</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-600">
+                {% for u in list_total %}
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="p-4 pl-6 font-bold text-blue-600">{{ u.username }}</td>
+                    <td class="p-4 font-semibold text-slate-800">{{ u.first_name }} {{ u.last_name }}</td>
+                    <td class="p-4 text-slate-400">{{ u.profile.phone_number|default:"-" }}</td>
+                    <td class="p-4 text-slate-500">{{ u.profile.get_company_display|default:"-" }}</td>
+                    <td class="p-4 text-center">
+                        {% if u.profile.person_status == 'normal' %}
+                            <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">ปกติ</span>
+                        {% elif u.profile.person_status == 'leave' %}
+                            <span class="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">ลา</span>
+                        {% else %}
+                            <span class="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">ราชการ</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="p-12 text-center text-slate-400 italic">📭 ยังไม่มีข้อมูลกำลังพลในฐานข้อมูล</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

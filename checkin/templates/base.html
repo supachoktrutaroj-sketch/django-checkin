@@ -54,8 +54,9 @@
             letter-spacing: 1px;
         }
 
-        .sidebar a {
+        .sidebar a, .sidebar-btn {
             display: block;
+            width: 100%;
             padding: 12px 14px;
             margin-bottom: 10px;
             text-decoration: none;
@@ -64,15 +65,119 @@
             border-radius: 10px;
             transition: 0.25s;
             font-weight: 500;
+            border: none;
+            text-align: left;
+            cursor: pointer;
+            font-size: 16px;
         }
 
-        .sidebar a:hover {
+        .sidebar a:hover, .sidebar-btn:hover {
             background: #2563eb;
             transform: translateX(4px);
         }
 
         .sidebar a.active {
             background: #2563eb;
+        }
+
+        /* 🎖️ สไตล์ปุ่มกดเปิด-ปิด เมนูสถานะกำลังพล */
+        .btn-status-toggle {
+            background: #4b5563; /* สีต่างจากเมนูปกติเล็กน้อยเพื่อให้ดูเป็นหมวดหมู่พิเศษ */
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .arrow-icon {
+            font-size: 11px;
+            transition: transform 0.2s;
+        }
+        .arrow-icon.rotate {
+            transform: rotate(180deg);
+        }
+
+        /* 🎨 Container ของกล่องสถานะ (รองรับการซ่อน/แสดง) */
+        .status-dropdown {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            margin-bottom: 10px;
+        }
+
+        .status-dropdown.show {
+            max-height: 500px; /* ขยายความสูงเมื่อสั่งเปิด */
+            overflow-y: auto;
+        }
+
+        .status-box-card {
+            background: #111827; /* ปรับโทนสีหลังเพื่อสร้างความต่างในระดับชั้น */
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .status-box-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .status-box-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .badge {
+            font-size: 11px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+        .badge-blue { background: rgba(59, 130, 246, 0.25); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); }
+        .badge-amber { background: rgba(245, 158, 11, 0.25); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+        .badge-emerald { background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+
+        .status-scroll-list {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 6px;
+            max-height: 85px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .status-scroll-list::-webkit-scrollbar { width: 4px; }
+        .status-scroll-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
+
+        .status-member-item {
+            font-size: 11px;
+            padding: 4px 6px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+            color: #d1d5db;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-member-item.b-blue { border-left: 3px solid #3b82f6; }
+        .status-member-item.b-amber { border-left: 3px solid #f59e0b; }
+        .status-member-item.b-emerald { border-left: 3px solid #10b981; }
+
+        .status-member-empty {
+            font-size: 11px;
+            color: #4b5563;
+            font-style: italic;
+            padding: 4px;
+            text-align: center;
         }
 
         .content {
@@ -103,46 +208,15 @@
             font-weight: bold;
         }
 
-        .alert-success {
-            background: #dcfce7;
-            color: #166534;
-            border: 1px solid #86efac;
-        }
-
-        .alert-error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fca5a5;
-        }
-
-        .alert-warning {
-            background: #fef3c7;
-            color: #92400e;
-            border: 1px solid #fcd34d;
-        }
-
-        .alert-info {
-            background: #dbeafe;
-            color: #1d4ed8;
-            border: 1px solid #93c5fd;
-        }
+        .alert-success { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .alert-warning { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+        .alert-info { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
 
         @media (max-width: 768px) {
-            .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-            }
-
-            .content {
-                margin-left: 0;
-                width: 100%;
-                padding: 15px;
-            }
-
-            .layout {
-                flex-direction: column;
-            }
+            .sidebar { width: 100%; height: auto; position: relative; }
+            .content { margin-left: 0; width: 100%; padding: 15px; }
+            .layout { flex-direction: column; }
         }
     </style>
 </head>
@@ -155,7 +229,6 @@
 
             <div class="menu-group">
                 <div class="menu-title">เมนูผู้ใช้</div>
-
                 <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">📊 Dashboard ผู้ใช้</a>
                 <a href="{% url 'profile' %}" class="{% if request.resolver_match.url_name == 'profile' %}active{% endif %}">👤 ข้อมูลส่วนตัว</a>
                 <a href="{% url 'checkin' %}" class="{% if request.resolver_match.url_name == 'checkin' %}active{% endif %}">📍 เช็คอิน / เช็คเอาต์</a>
@@ -165,12 +238,78 @@
             {% if request.user.is_staff %}
             <div class="menu-group">
                 <div class="menu-title">เมนูผู้ดูแล</div>
-
                 <a href="{% url 'admin_dashboard' %}" class="{% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">🛠️ Admin Dashboard</a>
                 <a href="{% url 'time_settings' %}" class="{% if request.resolver_match.url_name == 'time_settings' %}active{% endif %}">⏰ ตั้งค่าเวลา</a>
                 <a href="{% url 'export_pdf' %}" class="{% if request.resolver_match.url_name == 'export_pdf' %}active{% endif %}">📄 Export PDF</a>
+                
                 <a href="{% url 'manage_users' %}" class="{% if request.resolver_match.url_name == 'manage_users' %}active{% endif %}">🪖 จัดการกำลังพล</a>
-                <a href="/admin/">⚙️ Django Admin</a>
+                
+                <button type="button" class="sidebar-btn btn-status-toggle" onclick="toggleStatusDropdown()">
+                    <span>🎖️ สถานะกำลังพล</span>
+                    <span id="status-arrow" class="arrow-icon">▼</span>
+                </button>
+
+                <div id="status-dropdown-area" class="status-dropdown">
+                    
+                    <div class="status-box-card">
+                        <div class="status-box-header">
+                            <div class="status-box-title">
+                                <span>📥</span> <span>เข้ากรมแล้ว</span>
+                            </div>
+                            <span class="badge badge-blue">{{ stat_in_camp|default:"0" }} นาย</span>
+                        </div>
+                        <div class="status-scroll-list">
+                            {% for u in list_in_camp %}
+                                <div class="status-member-item b-blue">
+                                    <span>🪖 {{ u.first_name|default:u.username }}</span>
+                                </div>
+                            {% empty %}
+                                <div class="status-member-empty">ไม่มีรายชื่อกำลังพล</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="status-box-card">
+                        <div class="status-box-header">
+                            <div class="status-box-title">
+                                <span>📤</span> <span>ออกกรม</span>
+                            </div>
+                            <span class="badge badge-amber">{{ stat_out_camp|default:"0" }} นาย</span>
+                        </div>
+                        <div class="status-scroll-list">
+                            {% for u in list_out_camp %}
+                                <div class="status-member-item b-amber">
+                                    <span>🪖 {{ u.first_name|default:u.username }}</span>
+                                    <span style="font-size: 9px; opacity: 0.6; color: #fbbf24;">{{ u.profile.person_status }}</span>
+                                </div>
+                            {% empty %}
+                                <div class="status-member-empty">ไม่มีรายชื่อกำลังพล</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="status-box-card">
+                        <div class="status-box-header">
+                            <div class="status-box-title">
+                                <span>👥</span> <span>ยอดคงเหลือทั้งหมด</span>
+                            </div>
+                            <span class="badge badge-emerald">{{ stat_total|default:"0" }} นาย</span>
+                        </div>
+                        <div class="status-scroll-list">
+                            {% for u in list_total %}
+                                <div class="status-member-item b-emerald">
+                                    <span>🪖 {{ u.first_name|default:u.username }}</span>
+                                    <span style="font-size: 9px; padding: 1px 4px; background: rgba(255,255,255,0.1); border-radius: 4px;">
+                                        {{ u.profile.person_status|default:"ปกติ" }}
+                                    </span>
+                                </div>
+                            {% empty %}
+                                <div class="status-member-empty">ไม่มีรายชื่อกำลังพล</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                </div> <a href="/admin/">⚙️ Django Admin</a>
             </div>
             {% endif %}
 
@@ -205,6 +344,22 @@
         </div>
     </div>
 
+    <script>
+        function toggleStatusDropdown() {
+            const area = document.getElementById('status-dropdown-area');
+            const arrow = document.getElementById('status-arrow');
+            
+            if (area.classList.contains('show')) {
+                area.classList.remove('show');
+                arrow.classList.remove('rotate');
+                arrow.innerText = '▼';
+            } else {
+                area.classList.add('show');
+                arrow.classList.add('rotate');
+                arrow.innerText = '▲';
+            }
+        }
+    </script>
 </body>
 
 </html>

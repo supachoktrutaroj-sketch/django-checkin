@@ -43,6 +43,9 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                
+                # ➕ เปิดสวิตช์ดึงยอดกำลังพลแบบ Real-time ตรงนี้เลยครับสหาย!
+                'checkin.context_processors.total_stats_processor',
             ],
         },
     },
