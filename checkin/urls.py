@@ -7,14 +7,18 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('logout/', views.logout_view, name='logout'),
     path('dashboard/', views.dashboard, name='dashboard'),
-    path('history/', views.history_view, name='history'),
     path('checkin/', views.checkin_view, name='checkin'),
+    
+    # 📝 ตรงกับ views.history_view
+    path('history/', views.history_view, name='history'),
 
     path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
-    path('time-settings/', views.time_settings_view, name='time_settings'),
+    
+    # ⏱️ สลับไปเข้าหน้าแอดมินชั่วคราว (เนื่องจากใน views.py ยังไม่มีระบบตั้งเวลา)
+    path('time-settings/', views.admin_dashboard, name='time_settings'),
 
-    # ✅ Export
-    path('export-excel/', views.export_excel, name='export_excel'),
+    # 📊 ซ่อน export_excel ชั่วคราว (เพราะใน views.py ไม่มีฟังก์ชันนี้) ระบบจะได้เปิดได้สักทีครับ
+    path('export-excel/', views.admin_dashboard, name='export_excel'),
     path('export-pdf/', views.export_pdf, name='export_pdf'),
 
     path('profile/', views.profile_view, name='profile'),
@@ -26,14 +30,13 @@ urlpatterns = [
     # 🪖 จัดการกำลังพล
     path('manage-users/', views.manage_users, name='manage_users'),
     path('manage-users/add/', views.add_user_admin, name='add_user_admin'),
-    path('manage-users/edit/<int:user_id>/', views.edit_user_admin, name='edit_user_admin'),
     path('manage-users/delete/<int:user_id>/', views.delete_user_admin, name='delete_user_admin'),
 
-    # ลิงก์แยกหน้าดูรายชื่อกำลังพล 3 รูปแบบ
-    path('manage-users/in-camp/', views.manage_users, name='list_in_camp'),
-    path('manage-users/out-camp/', views.manage_users, name='list_out_camp'),
-    path('manage-users/total/', views.manage_users, name='list_total'),
+    # 💂‍♂️ ลิงก์แยกดูรายชื่อกำลังพล 3 รูปแบบ (ตรงตามฟังก์ชันท้ายไฟล์ views.py ของคุณ)
+    path('manage-users/in-camp/', views.list_in_camp_view, name='list_in_camp'),
+    path('manage-users/out-camp/', views.list_out_camp_view, name='list_out_camp'),
+    path('manage-users/total/', views.list_total_view, name='list_total'),
 
-    # 👑 เพิ่มหน้าตั้งพิกัดใหม่ (Superuser) รวมเข้าในชุดเดียวกันเรียบร้อย!
+    # 👑 หน้าตั้งพิกัดใหม่ (Superuser) ตรงตาม set_location_view ชัวร์ 100%
     path('set-location/', views.set_location_view, name='set_location'),
 ]

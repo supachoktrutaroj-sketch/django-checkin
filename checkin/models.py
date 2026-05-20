@@ -61,6 +61,17 @@ class SystemSetting(models.Model):
         default="18:00"
     )
 
+    # 📍 เพิ่มฟิลด์พิกัดศูนย์กลางหน่วยงาน (กำหนดพิกัดเริ่มต้นเป็น บก.ทบ. เพื่อไม่ให้ฐานข้อมูลว่าง)
+    latitude = models.FloatField(
+        default=13.819810,
+        verbose_name="ละติจูดที่ตั้งหน่วย"
+    )
+
+    longitude = models.FloatField(
+        default=100.529614,
+        verbose_name="ลองจิจูดที่ตั้งหน่วย"
+    )
+
     updated_at = models.DateTimeField(
         auto_now=True
     )
