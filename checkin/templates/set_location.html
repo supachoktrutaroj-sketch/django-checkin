@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 40px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+    <div style="text-align: center; margin-bottom: 25px;">
+        <h2 style="color: #1f2937;">👑 ตั้งค่าพิกัดหน่วยงาน</h2>
+        <p style="color: #6b7280; font-size: 14px;">(เฉพาะสิทธิ์ Superuser เท่านั้นที่แก้ไขส่วนนี้ได้)</p>
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 8px; color: #374151;">📍 ละติจูด (Latitude):</label>
+            <input type="text" id="id_latitude" name="latitude" 
+                   value="{{ current_lat|default:'' }}" 
+                   style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 16px; outline: none; transition: 0.3s;"
+                   placeholder="ตัวอย่าง: 13.819810" required>
+        </div>
+
+        <div style="margin-bottom: 25px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 8px; color: #374151;">📍 ลองจิจูด (Longitude):</label>
+            <input type="text" id="id_longitude" name="longitude" 
+                   value="{{ current_lon|default:'' }}" 
+                   style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 16px; outline: none; transition: 0.3s;"
+                   placeholder="ตัวอย่าง: 100.529614" required>
+        </div>
+
+        <button type="submit" style="width: 100%; background: #2563eb; color: white; border: none; padding: 14px; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s;">
+            💾 บันทึกพิกัดหน่วยใหม่
+        </button>
+    </form>
+    
+    <div style="margin-top: 20px; padding: 15px; background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 4px;">
+        <small style="color: #92400e;">
+            ** คำแนะนำ: เปิด Google Maps ค้นหาที่ตั้งกรม แล้วคลิกขวาที่จุดนั้นเพื่อคัดลอกตัวเลขพิกัดมาวาง
+        </small>
+    </div>
+</div>
+{% endblock %}

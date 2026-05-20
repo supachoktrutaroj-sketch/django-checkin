@@ -17,6 +17,10 @@ from django.http import HttpResponse, JsonResponse
 from django.conf import settings
 from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import user_passes_test
+
 
 import openpyxl
 
@@ -1025,3 +1029,28 @@ def manage_users(request):
         'filter_company': filter_company,
     }
     return render(request, 'manage_users.html', context)
+@user_passes_test(lambda u: u.is_superuser) # ล็อกสิทธิ์เฉพาะ Superuser เท่านั้น
+def set_location_view(request):
+    # 🛠️ ส่วนนี้คือการดึงพิกัดเดิมมาโชว์ในช่องกรอก (ถ้ามี)
+    # config = TimeSetting.objects.first() 
+    
+    if request.method == 'POST':
+        lat = request.POST.get('latitude')
+        lon = request.POST.get('longitude')
+        
+        # 🛠️ ส่วนนี้คือการบันทึกข้อมูลลงฐานข้อมูล
+        # if config:
+        #     config.latitude = lat
+        #     config.longitude = lon
+        #     config.save()
+        # else:
+        #     TimeSetting.objects.create(latitude=lat, longitude=lon)
+            
+        messages.success(request, f"อัปเดตพิกัดกรมเป็น {lat}, {lon} เรียบร้อยแล้ว!")
+        return redirect('set_location') # ชื่อตามที่เราตั้งใน urls.py
+
+    context = {
+        'current_lat': '13.819810', # ตัวอย่าง (ให้เปลี่ยนเป็น config.latitude)
+        'current_lon': '100.529614', # ตัวอย่าง (ให้เปลี่ยนเป็น config.longitude)
+    }
+    return render(request, 'set_location.html', context)

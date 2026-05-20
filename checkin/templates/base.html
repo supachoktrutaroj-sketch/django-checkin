@@ -82,7 +82,7 @@
 
         /* 🎖️ สไตล์ปุ่มกดเปิด-ปิด เมนูสถานะกำลังพล */
         .btn-status-toggle {
-            background: #4b5563; /* สีต่างจากเมนูปกติเล็กน้อยเพื่อให้ดูเป็นหมวดหมู่พิเศษ */
+            background: #4b5563; 
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -105,12 +105,12 @@
         }
 
         .status-dropdown.show {
-            max-height: 500px; /* ขยายความสูงเมื่อสั่งเปิด */
+            max-height: 500px; 
             overflow-y: auto;
         }
 
         .status-box-card {
-            background: #111827; /* ปรับโทนสีหลังเพื่อสร้างความต่างในระดับชั้น */
+            background: #111827; 
             border-radius: 12px;
             padding: 12px;
             margin-bottom: 10px;
@@ -241,11 +241,16 @@
                 <a href="{% url 'admin_dashboard' %}" class="{% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">🛠️ Admin Dashboard</a>
                 <a href="{% url 'time_settings' %}" class="{% if request.resolver_match.url_name == 'time_settings' %}active{% endif %}">⏰ ตั้งค่าเวลา</a>
                 <a href="{% url 'export_pdf' %}" class="{% if request.resolver_match.url_name == 'export_pdf' %}active{% endif %}">📄 Export PDF</a>
-                
                 <a href="{% url 'manage_users' %}" class="{% if request.resolver_match.url_name == 'manage_users' %}active{% endif %}">🪖 จัดการกำลังพล</a>
                 
+                {% if request.user.is_superuser %}
+                <a href="{% url 'set_location' %}" class="sidebar-btn {% if request.resolver_match.url_name == 'set_location' %}active{% endif %}" id="btn-sidebar-gps" style="background: #2563eb; display: block; text-align: left;">
+                    👑 ตั้งพิกัดปัจจุบัน (Superuser)
+                </a>
+                {% endif %}
+                
                 <button type="button" class="sidebar-btn btn-status-toggle" onclick="toggleStatusDropdown()">
-                    <span>🎖️ สถานะกำลังพล</span>
+                    <span>🎖️ Status กำลังพล</span>
                     <span id="status-arrow" class="arrow-icon">▼</span>
                 </button>
 
@@ -360,6 +365,39 @@
             }
         }
     </script>
+
+    {% if request.user.is_superuser %}
+    <script>
+        // ปรับแต่ง Logic ตรวจเช็คอินพุต: เมื่ออยู่หน้าจอตั้งพิกัดตัวปุ่มใน Sidebar จะช่วยประมวลผลฟอร์มและกด Submit ให้โดยอัตโนมัติ
+        document.getElementById('btn-sidebar-gps').addEventListener('click', function(e) {
+            const mainLatInput = document.getElementById('id_latitude');
+            const mainLonInput = document.getElementById('id_longitude');
+            
+            // หากระบบหาฟอร์มพิกัดในหน้าปัจจุบันเจอ ให้ทำตามกระบวนการยืนยันบันทึกข้อมูล
+            if (mainLatInput && mainLonInput) {
+                e.preventDefault(); // หยุดการเปิดลิงก์ชั่วคราวเพื่อรันสคริปต์ยืนยันพิกัดก่อน
+
+                const latVal = mainLatInput.value.trim();
+                const lonVal = mainLonInput.value.trim();
+
+                if (!latVal || !lonVal) {
+                    alert("✍️ กรุณาพิมพ์ระบุค่าละติจูดและลองจิจูดในกล่องข้อความบนหน้าเว็บก่อนครับ");
+                    return;
+                }
+
+                if (confirm(`ต้องการอัปเดตและบันทึกพิกัดด้วยค่าที่คุณกรอกใช่หรือไม่?\n\nละติจูด: ${latVal}\nลองจิจูด: ${lonVal}`)) {
+                    const mainForm = mainLatInput.closest('form');
+                    if (mainForm) {
+                        mainForm.submit(); 
+                    } else {
+                        alert("⚠️ เกิดข้อผิดพลาด: ไม่พบฟอร์มสำหรับส่งข้อมูล");
+                    }
+                }
+            }
+            // หากไม่ได้อยู่ในหน้าต่างฟอร์ม ปล่อยให้แท็ก <a> พาวิ่งเปลี่ยนหน้าไปยังที่ตั้งฟอร์มตามปกติ
+        });
+    </script>
+    {% endif %}
 </body>
 
 </html>

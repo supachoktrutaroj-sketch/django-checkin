@@ -23,14 +23,17 @@ urlpatterns = [
     path('save-face-descriptor/', views.save_face_descriptor, name='save_face_descriptor'),
     path('face-verify/', views.face_verify_page, name='face_verify'),
 
-    # 🪖 ปรับตรงนี้ลบ _view ออก ให้เหลือ views.manage_users ชัวร์กว่าครับ
+    # 🪖 จัดการกำลังพล
     path('manage-users/', views.manage_users, name='manage_users'),
     path('manage-users/add/', views.add_user_admin, name='add_user_admin'),
     path('manage-users/edit/<int:user_id>/', views.edit_user_admin, name='edit_user_admin'),
     path('manage-users/delete/<int:user_id>/', views.delete_user_admin, name='delete_user_admin'),
 
-    # ลิงก์แยกหน้าดูรายชื่อกำลังพล 3 รูปแบบ ปรับให้วิ่งไปที่ฟังก์ชันหลักทั้งหมดเพื่อไม่ให้ล่ม
+    # ลิงก์แยกหน้าดูรายชื่อกำลังพล 3 รูปแบบ
     path('manage-users/in-camp/', views.manage_users, name='list_in_camp'),
     path('manage-users/out-camp/', views.manage_users, name='list_out_camp'),
     path('manage-users/total/', views.manage_users, name='list_total'),
+
+    # 👑 เพิ่มหน้าตั้งพิกัดใหม่ (Superuser) รวมเข้าในชุดเดียวกันเรียบร้อย!
+    path('set-location/', views.set_location_view, name='set_location'),
 ]
