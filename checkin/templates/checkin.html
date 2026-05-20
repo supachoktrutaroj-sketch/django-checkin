@@ -32,18 +32,19 @@
         border-radius: 12px;
         font-weight: bold;
         font-size: 15px;
+        transition: all 0.3s ease;
     }
 
     .status-ok {
-        background: #e8f5e9;
-        color: #2e7d32;
-        border: 1px solid #81c784;
+        background: #e8f5e9 !important;
+        color: #2e7d32 !important;
+        border: 1px solid #81c784 !important;
     }
 
     .status-bad {
-        background: #ffebee;
-        color: #c62828;
-        border: 1px solid #ef9a9a;
+        background: #ffebee !important;
+        color: #c62828 !important;
+        border: 1px solid #ef9a9a !important;
     }
 
     .info-box {
@@ -84,10 +85,11 @@
     }
 
     .action-btn:disabled {
-        background: #9ca3af;
-        cursor: not-allowed;
-        box-shadow: none;
-        transform: none;
+        background: #9ca3af !important;
+        cursor: not-allowed !important;
+        box-shadow: none !important;
+        transform: none !important;
+        opacity: 0.6;
     }
 
     .error-text {
@@ -112,8 +114,14 @@
         width: 100%;
         border-radius: 14px;
         overflow: hidden;
+        background: #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #6b7280;
     }
 
+    /* สไตล์สำหรับกล่องหน้าต่างสแกนใบหน้า */
     .face-modal {
         display: none;
         position: fixed;
@@ -146,6 +154,7 @@
         border-radius: 14px;
         background: #111827;
         margin-bottom: 14px;
+        transform: scaleX(-1);
     }
 
     .face-status {
@@ -233,13 +242,15 @@
         <input type="hidden" name="latitude" id="lat">
         <input type="hidden" name="longitude" id="lon">
         <input type="hidden" name="action" id="actionInput">
+        <input type="hidden" name="verification_method" value="face_recognition">
+        <input type="hidden" name="confidence_score" id="confidenceScoreInput" value="0.0">
 
         <div class="btn-group">
-            <button class="action-btn btn-checkin" type="button" id="checkinBtn" onclick="startFaceFlow('checkin')">
+            <button class="action-btn btn-checkin" type="button" id="checkinBtn" onclick="startFaceFlow('checkin')" disabled>
                 ✅ เช็คอิน
             </button>
 
-            <button class="action-btn btn-checkout" type="button" id="checkoutBtn" onclick="startFaceFlow('checkout')">
+            <button class="action-btn btn-checkout" type="button" id="checkoutBtn" onclick="startFaceFlow('checkout')" disabled>
                 🔴 เช็คเอาต์
             </button>
         </div>
@@ -252,11 +263,11 @@
     </div>
 
     <div id="statusBox" class="status-box status-bad">
-        กำลังโหลด GPS...
+        กำลังโหลดตรวจสอบสัญญาณ GPS จริงของคุณ...
     </div>
 
     <div class="map-title">🗺️ แผนที่ตำแหน่ง</div>
-    <div id="map"></div>
+    <div id="map">🗺️ กำลังเรียกคืนข้อมูลแผนที่...</div>
 </div>
 
 <div class="face-modal" id="faceModal">
@@ -278,9 +289,9 @@
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
 <script>
-    let map;
-    let marker;
-    let officeCircle;
+    let map = null;
+    let marker = null;
+    let officeCircle = null;
 
     const officeLat = parseFloat("{{ office_lat|default:'0' }}");
     const officeLon = parseFloat("{{ office_lon|default:'0' }}");
@@ -307,23 +318,26 @@
     function calculateDistance(lat1, lon1, lat2, lon2) {
         const R = 6371000;
         const toRad = (value) => value * Math.PI / 180;
-
         const dLat = toRad(lat2 - lat1);
         const dLon = toRad(lon2 - lon1);
-
         const a =
             Math.sin(dLat / 2) * Math.sin(dLat / 2) +
             Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
             Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
     }
 
     function setStatus(ok, message) {
         const box = document.getElementById("statusBox");
-        box.className = ok ? "status-box status-ok" : "status-box status-bad";
-        box.innerText = message;
+        if (box) {
+            if (ok) {
+                box.className = "status-box status-ok";
+            } else {
+                box.className = "status-box status-bad";
+            }
+            box.innerText = message;
+        }
     }
 
     function setButtonsEnabled(enabled) {
@@ -334,7 +348,6 @@
     function setFaceStatus(message, type = "normal") {
         faceStatus.textContent = message;
         faceStatus.className = "face-status";
-
         if (type === "success") faceStatus.classList.add("success");
         if (type === "error") faceStatus.classList.add("error");
         if (type === "warning") faceStatus.classList.add("warning");
@@ -354,33 +367,9 @@
         }
     }
 
-    function initMap() {
-        const officeLocation = { lat: officeLat, lng: officeLon };
-
-        map = new google.maps.Map(document.getElementById("map"), {
-            zoom: 16,
-            center: officeLocation,
-        });
-
-        new google.maps.Marker({
-            position: officeLocation,
-            map: map,
-            title: "จุดเช็คอิน"
-        });
-
-        officeCircle = new google.maps.Circle({
-            strokeColor: "#22c55e",
-            strokeOpacity: 0.8,
-            strokeWeight: 2,
-            fillColor: "#22c55e",
-            fillOpacity: 0.2,
-            map: map,
-            center: officeLocation,
-            radius: allowedRadius
-        });
-
+    function trackUserLocation() {
         if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
+            navigator.geolocation.watchPosition(
                 function (position) {
                     const userLat = position.coords.latitude;
                     const userLon = position.coords.longitude;
@@ -388,48 +377,93 @@
                     document.getElementById("lat").value = userLat;
                     document.getElementById("lon").value = userLon;
 
-                    const userLocation = { lat: userLat, lng: userLon };
+                    const defaultLat = officeLat !== 0 ? officeLat : 13.8198;
+                    const defaultLon = officeLon !== 0 ? officeLon : 100.5296;
 
-                    marker = new google.maps.Marker({
-                        position: userLocation,
-                        map: map,
-                        title: "ตำแหน่งของคุณ",
-                        icon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
-                    });
-
-                    map.setCenter(userLocation);
-
-                    const distance = calculateDistance(userLat, userLon, officeLat, officeLon);
+                    const distance = calculateDistance(userLat, userLon, defaultLat, defaultLon);
                     document.getElementById("distanceText").innerText = Math.round(distance) + " เมตร";
+
+                    // อัปเดตตำแหน่งหมุดในแผนที่แบบครอบ try-catch เพื่อความปลอดภัยสูงสุด ⚡
+                    try {
+                        if (typeof google !== 'undefined' && google.maps && map) {
+                            const userLocation = { lat: userLat, lng: userLon };
+                            if (marker) {
+                                marker.setPosition(userLocation);
+                            } else {
+                                marker = new google.maps.Marker({
+                                    position: userLocation,
+                                    map: map,
+                                    title: "ตำแหน่งของคุณ",
+                                });
+                            }
+                        }
+                    } catch (e) {
+                        console.log("หมุดแผนที่ข้ามการทำงานชั่วคราวเนื่องจากสิทธิ์ Google Maps");
+                    }
 
                     if (distance <= allowedRadius) {
                         gpsAllowed = true;
-                        setStatus(true, "✅ อยู่ในพื้นที่ที่กำหนด สามารถดำเนินการได้");
+                        setStatus(true, "✅ พิกัดถูกต้องตามเงื่อนไข ปุ่มเช็คอินเปิดให้ใช้งานแล้ว");
                         setButtonsEnabled(true);
                     } else {
                         gpsAllowed = false;
-                        setStatus(false, "❌ อยู่นอกพื้นที่ที่กำหนด ยังไม่สามารถดำเนินการได้");
+                        setStatus(false, `❌ อยู่นอกพื้นที่ปฏิบัติงาน (ห่างเกินกำหนดอยู่ ${Math.round(distance - allowedRadius)} เมตร)`);
                         setButtonsEnabled(false);
                     }
                 },
-                function () {
+                function (error) {
                     gpsAllowed = false;
-                    setStatus(false, "❌ ไม่สามารถดึง GPS ได้ กรุณาอนุญาต location");
-                    document.getElementById("distanceText").innerText = "-";
+                    setStatus(false, "❌ ดึงสัญญาณพิกัดล้มเหลว กรุณาตรวจสอบสิทธิ์แชร์ตำแหน่งบนเบราว์เซอร์");
                     setButtonsEnabled(false);
-                }
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
             );
         } else {
             gpsAllowed = false;
-            setStatus(false, "❌ เบราว์เซอร์นี้ไม่รองรับ GPS");
-            document.getElementById("distanceText").innerText = "-";
+            setStatus(false, "❌ อุปกรณ์หรือเบราว์เซอร์นี้ไม่รองรับระบบ GPS");
             setButtonsEnabled(false);
+        }
+    }
+
+    function initMap() {
+        const defaultLat = officeLat !== 0 ? officeLat : 13.8198;
+        const defaultLon = officeLon !== 0 ? officeLon : 100.5296;
+        const officeLocation = { lat: defaultLat, lng: defaultLon };
+
+        try {
+            if (typeof google !== 'undefined' && google.maps) {
+                map = new google.maps.Map(document.getElementById("map"), {
+                    zoom: 16,
+                    center: officeLocation,
+                    disableDefaultUI: false
+                });
+
+                new google.maps.Marker({
+                    position: officeLocation,
+                    map: map,
+                    title: "จุดเช็คอิน"
+                });
+
+                officeCircle = new google.maps.Circle({
+                    strokeColor: "#22c55e",
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
+                    fillColor: "#22c55e",
+                    fillOpacity: 0.15,
+                    map: map,
+                    center: officeLocation,
+                    radius: allowedRadius
+                });
+            }
+        } catch (mapError) {
+            console.error("Google Maps Render Blocked:", mapError);
+            document.getElementById("map").innerText = "🗺️ แผนที่ไม่สามารถแสดงผลได้เนื่องจากข้อจำกัดของ API Key (ไม่มีผลต่อการเช็คอิน)";
         }
     }
 
     function startFaceFlow(action) {
         if (!gpsAllowed) {
-            alert("ยังไม่สามารถดำเนินการได้ เพราะ GPS ไม่พร้อมหรืออยู่นอกพื้นที่");
+            alert("ไม่สามารถดำเนินการได้ เนื่องจากอยู่นอกพื้นที่พิกัดสัญญาณ");
             return;
         }
 
@@ -439,7 +473,7 @@
         faceModal.style.display = "flex";
 
         if (!faceModelsLoaded) {
-            setFaceStatus("⚠️ ระบบจดจำใบหน้ายังไม่พร้อม กรุณารอสักครู่", "warning");
+            setFaceStatus("⚠️ ระบบจดจำใบหน้ายังโหลดไม่เสร็จ กรุณารอสักครู่", "warning");
         } else {
             setFaceStatus("กรุณาเปิดกล้อง แล้วกดเริ่มสแกน", "warning");
         }
@@ -451,12 +485,10 @@
                 video: { facingMode: "user" },
                 audio: false
             });
-
             faceVideo.srcObject = stream;
             faceStream = stream;
             faceCameraStarted = true;
             submitStarted = false;
-
             setFaceStatus("✅ กล้องพร้อมใช้งาน กรุณากดเริ่มสแกน", "success");
         } catch (err) {
             setFaceStatus("❌ เปิดกล้องไม่สำเร็จ: " + err.message, "error");
@@ -468,12 +500,10 @@
         pendingAction = null;
         submitStarted = false;
         resetChallengeState();
-
         if (faceStream) {
             faceStream.getTracks().forEach(track => track.stop());
             faceStream = null;
         }
-
         faceVideo.srcObject = null;
         faceCameraStarted = false;
     }
@@ -510,34 +540,28 @@
 
     function isNodPassed(landmarks) {
         const nose = getNose(landmarks);
-
         if (!nodBaseY) {
             nodBaseY = nose.y;
             return false;
         }
-
         return Math.abs(nose.y - nodBaseY) > 18;
     }
 
     function isNearPassed(detection) {
         const size = detection.detection.box.width;
-
         if (!baseFaceSize) {
             baseFaceSize = size;
             return false;
         }
-
         return size > baseFaceSize * 1.18;
     }
 
     function isFarPassed(detection) {
         const size = detection.detection.box.width;
-
         if (!baseFaceSize) {
             baseFaceSize = size;
             return false;
         }
-
         return size < baseFaceSize * 0.82;
     }
 
@@ -549,121 +573,99 @@
             { key: "near", text: "เอาหน้าเข้าใกล้กล้อง" },
             { key: "far", text: "ถอยหน้าออกจากกล้อง" }
         ];
-
         list.sort(() => Math.random() - 0.5);
         return list.slice(0, 2);
     }
 
     async function runOneChallenge(challenge, index, total) {
         resetChallengeState();
-
         const startedAt = Date.now();
         const deadline = startedAt + (CHALLENGE_SECONDS * 1000);
 
         while (Date.now() < deadline) {
             const remain = Math.ceil((deadline - Date.now()) / 1000);
-
-            setFaceStatus(
-                `ขั้นที่ ${index + 1}/${total}: ${challenge.text} ภายใน ${remain} วินาที`,
-                "warning"
-            );
+            setFaceStatus(`ขั้นที่ ${index + 1}/${total}: ${challenge.text} ภายใน ${remain} วินาที`, "warning");
 
             const detection = await detectFace();
-
             if (!detection) {
-                setFaceStatus("❌ ไม่พบใบหน้า กรุณาหันหน้าเข้ากล้อง", "error");
+                setFaceStatus("❌ 不ไม่พบใบหน้า กรุณาหันหน้าเข้ากล้อง", "error");
                 await wait(500);
                 continue;
             }
 
             let passed = false;
-
-            if (challenge.key === "left") {
-                passed = isTurnLeftPassed(detection.landmarks);
-            } else if (challenge.key === "right") {
-                passed = isTurnRightPassed(detection.landmarks);
-            } else if (challenge.key === "nod") {
-                passed = isNodPassed(detection.landmarks);
-            } else if (challenge.key === "near") {
-                passed = isNearPassed(detection);
-            } else if (challenge.key === "far") {
-                passed = isFarPassed(detection);
-            }
+            if (challenge.key === "left") passed = isTurnLeftPassed(detection.landmarks);
+            else if (challenge.key === "right") passed = isTurnRightPassed(detection.landmarks);
+            else if (challenge.key === "nod") passed = isNodPassed(detection.landmarks);
+            else if (challenge.key === "near") passed = isNearPassed(detection);
+            else if (challenge.key === "far") passed = isFarPassed(detection);
 
             if (passed) {
                 setFaceStatus(`✅ ผ่านขั้นที่ ${index + 1}: ${challenge.text}`, "success");
                 await wait(900);
                 return detection;
             }
-
             await wait(250);
         }
-
         throw new Error(`หมดเวลาในขั้นตอน: ${challenge.text}`);
     }
 
     async function verifyDetectedFace(detection) {
+        if (!savedDescriptor || savedDescriptor.length === 0) {
+            setFaceStatus("❌ ไม่พบข้อมูลใบหน้าที่ลงทะเบียนไว้", "error");
+            return;
+        }
         const labeledDescriptor = new faceapi.LabeledFaceDescriptors(
             "owner",
             [new Float32Array(savedDescriptor)]
         );
-
         const faceMatcher = new faceapi.FaceMatcher([labeledDescriptor], 0.5);
         const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
 
         if (bestMatch.label === "owner") {
             submitStarted = true;
-            setFaceStatus("✅ ผ่านการตรวจจับคนจริง และยืนยันใบหน้าสำเร็จ", "success");
+            setFaceStatus("✅ ยืนยันตัวตนสำเร็จ ระบบกำลังนำส่งข้อมูล...", "success");
 
             document.getElementById("actionInput").value = pendingAction;
+            const score = (1 - bestMatch.distance).toFixed(2);
+            document.getElementById("confidenceScoreInput").value = score;
 
             setTimeout(() => {
                 document.getElementById("checkinForm").submit();
-            }, 500);
+            }, 600);
         } else {
-            setFaceStatus("❌ ใบหน้าไม่ตรงกับบัญชีนี้", "error");
+            setFaceStatus("❌ ใบหน้าไม่ตรงกับผู้ใช้งานในระบบ", "error");
         }
     }
 
     async function verifyFaceAndSubmit() {
         try {
             if (submitStarted) return;
-
             if (!faceModelsLoaded) {
                 setFaceStatus("⚠️ ระบบจดจำใบหน้ายังโหลดไม่เสร็จ", "warning");
                 return;
             }
-
             if (!faceCameraStarted || !faceVideo.srcObject) {
                 setFaceStatus("⚠️ กรุณากดเปิดกล้องก่อน", "warning");
                 return;
             }
 
-            if (!savedDescriptor || savedDescriptor.length === 0) {
-                setFaceStatus("❌ ไม่พบข้อมูลใบหน้าที่ลงทะเบียนไว้", "error");
-                return;
-            }
-
             const challenges = getRandomChallenges();
-
-            setFaceStatus("กำลังเริ่มตรวจจับคนจริงแบบสุ่ม...", "warning");
+            setFaceStatus("กำลังสุ่มบททดสอบตัวตนจริง...", "warning");
             await wait(800);
 
             let lastDetection = null;
-
             for (let i = 0; i < challenges.length; i++) {
                 lastDetection = await runOneChallenge(challenges[i], i, challenges.length);
             }
 
-            setFaceStatus("กำลังตรวจสอบใบหน้า...", "warning");
-
+            setFaceStatus("ตรวจสอบความถูกต้องโครงสร้างใบหน้า...", "warning");
             const finalDetection = await detectFace();
 
             if (!finalDetection) {
-                setFaceStatus("❌ ไม่พบใบหน้าตอนยืนยัน กรุณาลองใหม่", "error");
+                setFaceStatus("❌ ไม่พบใบหน้าขั้นตอนสุดท้าย กรุณาลองใหม่", "error");
                 return;
             }
-
             await verifyDetectedFace(finalDetection);
 
         } catch (err) {
@@ -673,6 +675,7 @@
     }
 
     window.onload = function () {
+        trackUserLocation();
         loadFaceModels();
 
         const pageError = document.getElementById("pageError");
@@ -682,7 +685,6 @@
     };
 </script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap" async
-    defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap" async defer></script>
 
 {% endblock %}

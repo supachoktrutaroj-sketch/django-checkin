@@ -585,21 +585,85 @@ def face_verify_page(request):
 
 @login_required
 def checkin_view(request):
-    """ หน้าเช็คอินและบันทึกพิกัด GPS """
+    """ หน้าเช็คอินและบันทึกพิกัด GPS (รองรับการโหลดหน้า และการรับค่า PUSH/POST มาบันทึก) """
     office_lat = 13.819810075005167
     office_lon = 100.52961418065506
     allowed_radius = 600
     location_name = "จุดบริการกำลังพล"
-    
+
+    # ====================================================
+    #  ส่วนที่ 1: รองรับการส่งข้อมูลกลับมาบันทึก (POST)
+    # ====================================================
+    if request.method == 'POST':
+        user_lat = request.POST.get('latitude')
+        user_lon = request.POST.get('longitude')
+        action = request.POST.get('action')  # 'checkin' หรือ 'checkout'
+        verification_method = request.POST.get('verification_method', 'face_recognition')
+        confidence_score = request.POST.get('confidence_score', '0.0')
+
+        # ตรวจสอบความครบถ้วนของข้อมูลพิกัด
+        if not user_lat or not user_lon:
+            messages.error(request, 'ไม่สามารถบันทึกได้เนื่องจากระบบตรวจไม่พบพิกัด GPS จริงของคุณ')
+            return redirect('checkin')
+
+        try:
+            # คำนวณระยะห่างจริง ณ เสี้ยววินาทีที่กดส่ง เพื่อป้องกันการสปูฟค่าพิกัดหน้าเว็บ
+            distance = calculate_distance(float(user_lat), float(user_lon), office_lat, office_lon)
+            
+            # ตรวจสอบว่าพิกัดข้ามรัศมีที่อนุญาตหรือไม่
+            if distance > allowed_radius:
+                messages.error(request, f'บันทึกไม่สำเร็จ: คุณอยู่ห่างจากจุดที่กำหนดเกินไป (ห่าง {int(distance)} เมตร)')
+                return redirect('checkin')
+
+            # คำนวณสถานะเวลา มาปกติ / มาสาย
+            status = calculate_status(timezone.now()) if action == 'checkin' else 'present'
+
+            # บันทึกลงฐานข้อมูลโมเดล CheckInRecord
+            record = CheckInRecord.objects.create(
+                user=request.user,
+                latitude=float(user_lat),
+                longitude=float(user_lon),
+                action=action,
+                status=status,
+                verification_method=verification_method,
+                confidence_score=float(confidence_score),
+                distance_meters=float(distance)
+            )
+
+            # ยิงแจ้งเตือนเข้าห้อง LINE ของหน่วยงานทันที
+            try:
+                notify_line_return_status(trigger_record=record)
+            except Exception as line_err:
+                print(f"ระบบแจ้งเตือน LINE ขัดข้องชั่วคราว: {line_err}")
+
+            action_th = "เช็คอินเข้าปฏิบัติงาน" if action == 'checkin' else "เช็คเอาต์กลับ"
+            messages.success(request, f'✨ บันทึกข้อมูล {action_th} สำเร็จเรียบร้อยแล้ว!')
+            return redirect('dashboard')
+
+        except Exception as e:
+            messages.error(request, f'เกิดข้อผิดพลาดระหว่างบันทึกข้อมูล: {str(e)}')
+            return redirect('checkin')
+
+    # ====================================================
+    #  ส่วนที่ 2: สำหรับเปิดหน้าจอปกติ (GET)
+    # ====================================================
+    try:
+        face_profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
+        saved_descriptor = face_profile.face_descriptor if face_profile.face_descriptor else '[]'
+    except Exception:
+        saved_descriptor = '[]'
+        
+    google_maps_api_key = getattr(settings, 'AIzaSyAdEA5DMsDjS26MJotjMxeXkDRxbZZo_dY', '')
+
     context = {
         'office_lat': office_lat,
         'office_lon': office_lon,
         'allowed_radius': allowed_radius,
-        'location_name': location_name
+        'location_name': location_name,
+        'saved_descriptor': saved_descriptor,
+        'google_maps_api_key': google_maps_api_key,
     }
     return render(request, 'checkin.html', context)
-
-
 # ====================================================
 #  ⚙️ เมนูแอดมิน: ระบบจัดการข้อมูลกำลังพล (Personnel Management)
 # ====================================================
