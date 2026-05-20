@@ -621,27 +621,18 @@ def time_settings_view(request):
 def export_excel(request):
     return HttpResponse("Export Excel")
 
-
 @login_required
 @user_passes_test(is_admin_or_staff, login_url='dashboard')
 def export_pdf(request):
-    return HttpResponse("Export PDF")
-
-
-@login_required
-@user_passes_test(is_admin_or_staff, login_url='dashboard')
-def manage_users_view(request):
-    """ หน้าแสดงรายชื่อ ค้นหา Filter และจัดการสถานะกำลังพลทั้งหมด """
-    company_choices = UserProfile.COMPANY_CHOICES if hasattr(UserProfile, 'COMPANY_CHOICES') else []
-    status_choices = UserProfile.STATUS_CHOICES if hasattr(UserProfile, 'STATUS_CHOICES') else []
-
-    # 🛠️ แก้ไขจุดล่ม: เปลี่ยนชื่อใน select_related() ให้เป็น 'profile' และ 'face_profile' ตามที่ระบบมีอยู่จริง
+    """ ฟังก์ชันดึงข้อมูลตาม Filter ล่าสุด เพื่อส่งไปหน้าพิมพ์รายงาน/PDF """
+    
+    # 1. ดึงข้อมูลกำลังพล (กรองแอดมินออกเหมือนหน้าหลัก)
     users_queryset = User.objects.filter(
         is_superuser=False,
         is_staff=False
     ).select_related('profile', 'face_profile')
 
-    # ระบบค้นหา (Search)
+    # 2. กรองข้อมูลตามที่แอดมินค้นหาค้างไว้ (ถ้ามี)
     search_query = request.GET.get('search', '').strip()
     if search_query:
         users_queryset = users_queryset.filter(
@@ -650,34 +641,18 @@ def manage_users_view(request):
             Q(last_name__icontains=search_query)
         )
 
-    # ระบบกรองกองร้อย (Filter)
     filter_company = request.GET.get('company_filter', '').strip()
     if filter_company:
-        # 🛠️ แก้ไขจุดนี้ด้วย: เปลี่ยน 'userprofile__company' เป็น 'profile__company'
         users_queryset = users_queryset.filter(profile__company=filter_company)
 
-    # ตกแต่ง Badge สำหรับผู้ใช้แต่ละคนในการจัดการฝั่งแอดมิน
-    for user in users_queryset:
-        prof = getattr(user, 'profile', None)  # 🛠️ แก้ไขจุดนี้ด้วย: เปลี่ยนจาก 'userprofile' เป็น 'profile'
-        status = prof.person_status if prof else 'normal'
-        
-        if status == 'normal':
-            user.status_ui = "bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold"
-        elif status == 'leave':
-            user.status_ui = "bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold"
-        else:
-            user.status_ui = "bg-rose-100 text-rose-800 px-2 py-1 rounded text-xs font-semibold"
-
+    # 3. ส่งข้อมูลไปที่หน้า HTML พิเศษสำหรับสั่งพิมพ์ PDF
     context = {
         'users': users_queryset,
-        'company_choices': company_choices,
-        'status_choices': status_choices,
         'search_query': search_query,
         'filter_company': filter_company,
+        'current_date': timezone.now() if 'timezone' in globals() else None
     }
-    return render(request, 'manage_users.html', context)
-
-
+    return render(request, 'export_pdf_template.html', context)
 @login_required
 @user_passes_test(is_admin_or_staff, login_url='dashboard')
 @require_POST
@@ -900,3 +875,89 @@ def list_total_view(request):
         'stat_total': stat_total,
     }
     return render(request, 'list_total.html', context)
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.models import User
+from django.db.models import Q
+from .models import UserProfile  # ตรวจสอบชื่อโมเดลโปรไฟล์ของพี่ด้วยนะครับ
+# หากใช้ Django timezone ให้ import มาด้วย (ถ้าไม่มีให้ลบ บรรทัด current_date ใน context ออก)
+from django.utils import timezone 
+
+def is_admin_or_staff(user):
+    return user.is_authenticated and (user.is_superuser or user.is_staff)
+
+@login_required
+@user_passes_test(is_admin_or_staff, login_url='dashboard')
+def export_pdf(request):
+    """ ฟังก์ชันดึงข้อมูลตาม Filter ล่าสุด เพื่อส่งไปหน้าพิมพ์รายงาน/PDF """
+    users_queryset = User.objects.filter(
+        is_superuser=False,
+        is_staff=False
+    ).select_related('profile', 'face_profile')
+
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        users_queryset = users_queryset.filter(
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query)
+        )
+
+    filter_company = request.GET.get('company_filter', '').strip()
+    if filter_company:
+        users_queryset = users_queryset.filter(profile__company=filter_company)
+
+    context = {
+        'users': users_queryset,
+        'search_query': search_query,
+        'filter_company': filter_company,
+        'current_date': timezone.now()
+    }
+    return render(request, 'export_pdf_template.html', context)
+
+
+@login_required
+@user_passes_test(is_admin_or_staff, login_url='dashboard')
+def manage_users(request):
+    """ หน้าแสดงรายชื่อ ค้นหา Filter และจัดการสถานะกำลังพลทั้งหมด (ตัวจริงที่ระบบเรียกหา) """
+    company_choices = UserProfile.COMPANY_CHOICES if hasattr(UserProfile, 'COMPANY_CHOICES') else []
+    status_choices = UserProfile.STATUS_CHOICES if hasattr(UserProfile, 'STATUS_CHOICES') else []
+
+    users_queryset = User.objects.filter(
+        is_superuser=False,
+        is_staff=False
+    ).select_related('profile', 'face_profile')
+
+    # ระบบค้นหา (Search)
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        users_queryset = users_queryset.filter(
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query)
+        )
+
+    # ระบบกรองกองร้อย (Filter)
+    filter_company = request.GET.get('company_filter', '').strip()
+    if filter_company:
+        users_queryset = users_queryset.filter(profile__company=filter_company)
+
+    # ตกแต่ง UI Badge สำหรับสถานะ
+    for user in users_queryset:
+        prof = getattr(user, 'profile', None)
+        status = prof.person_status if prof else 'normal'
+        if status == 'normal':
+            user.status_ui = "bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold"
+        elif status == 'leave':
+            user.status_ui = "bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold"
+        else:
+            user.status_ui = "bg-rose-100 text-rose-800 px-2 py-1 rounded text-xs font-semibold"
+
+    context = {
+        'users': users_queryset,
+        'company_choices': company_choices,
+        'status_choices': status_choices,
+        'search_query': search_query,
+        'filter_company': filter_company,
+    }
+    return render(request, 'manage_users.html', context)

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>รายงานรายชื่อกำลังพล</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            .no-print { display: none; }
+            body { background-color: #fff; color: #000; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 p-8 font-sans">
+
+    <div class="no-print max-w-4xl mx-auto mb-6 bg-white p-4 rounded-xl shadow-sm flex justify-between items-center border border-slate-200">
+        <span class="text-sm font-medium text-slate-600">📄 หน้าต่างเตรียมพิมพ์รายงาน (กรุณากดปุ่มเพื่อบันทึกเป็น PDF)</span>
+        <div class="flex gap-2">
+            <button onclick="window.print()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition-all">
+                🖨️ กดสั่งพิมพ์ / บันทึก PDF
+            </button>
+            <button onclick="window.history.back()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition-all">
+                กลับหน้าหลัก
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto bg-white p-10 rounded-xl shadow-sm border border-slate-300 min-h-[297mm]">
+        <div class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-slate-800">รายงานรายชื่อกำลังพลทั้งหมดในระบบ</h1>
+            <p class="text-sm text-slate-500 mt-1">ระบบเช็กอินข้อมูลกำลังพล (django-checkin)</p>
+            {% if filter_company %}
+                <p class="text-xs text-blue-600 font-semibold mt-1">สังกัด: {{ filter_company }}</p>
+            {% endif %}
+            <hr class="mt-4 border-slate-300">
+        </div>
+
+        <table class="w-full text-sm text-left border border-collapse border-slate-400">
+            <thead class="bg-slate-100 text-slate-800 uppercase text-xs font-bold">
+                <tr>
+                    <th class="p-3 border border-slate-400">Username</th>
+                    <th class="p-3 border border-slate-400">ชื่อ-นามสกุล</th>
+                    <th class="p-3 border border-slate-400">เบอร์โทรศัพท์</th>
+                    <th class="p-3 border border-slate-400">สังกัดกองร้อย</th>
+                    <th class="p-3 border border-slate-400 text-center">สถานะ</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-300">
+                {% for user in users %}
+                <tr class="hover:bg-slate-50">
+                    <td class="p-3 border border-slate-400 font-mono text-blue-600">{{ user.username }}</td>
+                    <td class="p-3 border border-slate-400 font-medium text-slate-800">{{ user.first_name }} {{ user.last_name }}</td>
+                    <td class="p-3 border border-slate-400 text-slate-600">{{ user.profile.phone_number|default:"-" }}</td>
+                    <td class="p-3 border border-slate-400 text-slate-600">{{ user.profile.get_company_display|default:user.profile.company }}</td>
+                    <td class="p-3 border border-slate-400 text-center font-bold text-slate-700">
+                        {% if user.profile.person_status == 'normal' %}ปกติ
+                        {% elif user.profile.person_status == 'leave' %}ลา
+                        {% else %}ราชการ{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="p-8 text-center text-slate-400">ไม่พบข้อมูลกำลังพลตามเงื่อนไขที่ค้นหา</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</body>
+</html>
