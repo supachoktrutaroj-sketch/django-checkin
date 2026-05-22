@@ -687,30 +687,74 @@ def checkin_view(request):
             return redirect('checkin')
 
         try:
+# 🛠️ จุดที่เพิ่มใหม่: เช็คว่าวันนี้คนๆ นี้เคยเช็คอิน (action='checkin') ไปแล้วหรือยัง
+            if action == 'checkin':
+                today = timezone.localdate()
+                already_checked_in = CheckInRecord.objects.filter(
+                    user=request.user,
+                    created_at__date=today,
+                    action='checkin'
+                ).exists()
 
-            distance = calculate_distance(
-                float(user_lat),
-                float(user_lon),
-                OFFICE_LAT,
-                OFFICE_LON
+                if already_checked_in:
+                    # ถ้าเคยเช็คอินไปแล้วในวันนี้ ให้แจ้งเตือนฝั่งหน้าเว็บและเด้งกลับทันที ไม่บันทึกซ้ำ
+                    messages.error(
+                        request,
+                        'วันนี้คุณได้ทำการเช็คอินไปเรียบร้อยแล้ว ไม่สามารถเช็คอินซ้ำได้'
+                    )
+                    return redirect('checkin')
+
+            # ---------------------------------------------------------------------
+            # (โค้ดเดิมด้านล่าง) ทำงานตามปกติหากผ่านเงื่อนไขด้านบน หรือถ้าเลือกสแกน 'checkout'
+            record = CheckInRecord.objects.create(
+                user=request.user,
+                latitude=float(user_lat),
+                longitude=float(user_lon),
+                action=action,
+                status=status,
+                verification_method=verification_method,
+                confidence_score=float(confidence_score),
+                distance_meters=float(distance)
             )
 
-            if distance > ALLOWED_RADIUS:
+            # 🛠️ อัปเดตสถานะใน UserProfile เพื่อให้หน้าจัดการกำลังพลเปลี่ยนตามทันที
+            try:
+                # ดึงข้อมูล Profile ของคนที่กำลังแสกนหน้า
+                profile, _ = UserProfile.objects.get_or_create(user=request.user)
+                
+                if action == 'checkin':
+                    profile.person_status = 'normal'  # เมื่อเช็คอินสำเร็จ -> เปลี่ยนสถานะเป็น "ปกติ"
+                elif action == 'checkout':
+                    profile.person_status = 'home'    # เมื่อเช็คเอาต์สำเร็จ -> เปลี่ยนสถานะเป็น "กลับบ้าน"
+                
+                profile.save()
+            except Exception as profile_err:
+                print("PROFILE UPDATE ERROR:", profile_err)
 
-                messages.error(
-                    request,
-                    f'อยู่นอกพื้นที่ ({int(distance)} เมตร)'
+            # 2. ส่งการแจ้งเตือนเข้าไปยังระบบ LINE
+            try:
+                notify_line_return_status(
+                    trigger_record=record
                 )
+            except Exception as e:
+                print("LINE ERROR:", e)
 
-                return redirect('checkin')
-
-            status = (
-                calculate_status(timezone.now())
-                if action == 'checkin'
-                else 'present'
+            messages.success(
+                request,
+                'บันทึกสำเร็จ'
             )
 
-            # 1. บันทึกข้อมูลประวัติการสแกนใบหน้าเข้า CheckInRecord
+            return redirect('dashboard')
+
+        except Exception as e:
+
+            messages.error(
+                request,
+                str(e)
+            )
+
+            return redirect('checkin')
+        # 1. บันทึกข้อมูลประวัติการสแกนใบหน้าเข้า CheckInRecord
             record = CheckInRecord.objects.create(
                 user=request.user,
                 latitude=float(user_lat),
@@ -806,11 +850,40 @@ def checkin_view(request):
 @login_required
 @user_passes_test(is_admin_or_staff)
 def admin_dashboard(request):
+    today = timezone.localdate()
+
+    # 1. ดึงข้อมูลโมเดล SystemSetting ส่งไปทั้งก้อน (แก้ปัญหาเวลากลับเข้ากรม และเคลียร์ NaN ใน JavaScript)
+    system_setting = SystemSetting.objects.first()
+
+    # 2. คำนวณจำนวนกำลังพลทั้งหมด (ไม่รวมแอดมิน)
+    total_users = User.objects.filter(
+        is_superuser=False,
+        is_staff=False,
+        is_active=True
+    ).count()
+
+    # 3. นับจำนวนคนที่เช็คอินวันนี้แล้ว (นับแบบไม่ซ้ำคนใน 1 วัน)
+    today_records = CheckInRecord.objects.filter(created_at__date=today)
+    
+    # 4. ดึงรายชื่อออบเจกต์ User ของคนที่ "ยังไม่ได้เช็คอิน" ในวันนี้ เพื่อเอาไปวนลูปแสดงในตาราง
+    checked_user_ids = today_records.filter(action='checkin').values_list('user_id', flat=True)
+    not_checkedin_users = User.objects.filter(
+        is_superuser=False,
+        is_staff=False,
+        is_active=True
+    ).exclude(id__in=checked_user_ids).select_related('profile')
+
+    # 5. จัดตัวแปรลงชื่อคีย์เวิร์ดที่ไฟล์ HTML ชุดเก่าตั้งเอาไว้เป๊ะๆ
+    context = {
+        'system_setting': system_setting,          # 👈 แมทช์กับ {{ system_setting }} ทั่วทั้งหน้าจอ
+        'not_checkedin_users': not_checkedin_users,  # 👈 แมทช์กับ {{ not_checkedin_users }} ในตารางและการ์ดสีแดง
+    }
+
     return render(
         request,
-        'admin_dashboard.html'
+        'admin_dashboard.html',
+        context
     )
-
 
 @login_required
 @user_passes_test(is_admin_or_staff)
@@ -863,7 +936,6 @@ def manage_users(request):
         'manage_users.html',
         context
     )
-
 
 @login_required
 @user_passes_test(is_admin_or_staff)
