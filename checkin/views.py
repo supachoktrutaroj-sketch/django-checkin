@@ -118,8 +118,8 @@ def get_system_setting():
             checkin_start_time='08:00',
             late_time='08:30',
             return_deadline='18:00',
-            latitude=13.819810,
-            longitude=100.529614
+            latitude=13.968636,
+            longitude=100.652162
         )
 
     return setting
@@ -175,7 +175,6 @@ def line_webhook(request):
 
     return JsonResponse({'message': 'ok'})
 
-
 def build_line_summary_message(trigger_record=None):
 
     today = timezone.localdate()
@@ -196,7 +195,7 @@ def build_line_summary_message(trigger_record=None):
         is_active=True
     ).count()
 
-    not_checked_count = total_users - checked_count
+    not_checked_count = max(total_users - checked_count, 0)
 
     lines = []
 
@@ -208,10 +207,11 @@ def build_line_summary_message(trigger_record=None):
             else 'เช็คเอาต์'
         )
 
+        # 💡 ดึงชื่อจริง (first_name) มาแสดงผล ถ้าไม่มีค่อยใช้ username
+        display_name = trigger_record.user.first_name or trigger_record.user.username
+
         lines.append("📢 มีการอัปเดต")
-        lines.append(
-            f"ชื่อ: {trigger_record.user.username}"
-        )
+        lines.append(f"ชื่อ: {display_name}")
         lines.append(f"รายการ: {action_text}")
         lines.append(
             f"เวลา: {timezone.localtime(trigger_record.created_at).strftime('%H:%M:%S')}"
@@ -219,13 +219,10 @@ def build_line_summary_message(trigger_record=None):
 
         lines.append("")
 
-    lines.append(
-        f"✅ เช็คอินแล้ว: {checked_count} คน"
-    )
-
-    lines.append(
-        f"❌ ยังไม่มา: {not_checked_count} คน"
-    )
+    # 📊 ปรับเปลี่ยนข้อความแสดงผลสรุปยอดตามที่คุณต้องการ
+    lines.append(f"✅ มาแล้ว: {checked_count} คน")
+    lines.append(f"❌ ไม่มา: {not_checked_count} คน")
+    lines.append(f"📊 ทั้งหมด: {total_users} คน") # 👈 เพิ่มบรรทัดนี้เข้าไป
 
     return "\n".join(lines)
 
@@ -713,6 +710,7 @@ def checkin_view(request):
                 else 'present'
             )
 
+            # 1. บันทึกข้อมูลประวัติการสแกนใบหน้าเข้า CheckInRecord
             record = CheckInRecord.objects.create(
                 user=request.user,
                 latitude=float(user_lat),
@@ -724,6 +722,21 @@ def checkin_view(request):
                 distance_meters=float(distance)
             )
 
+            # 🛠️ จุดที่เพิ่มใหม่: อัปเดตสถานะใน UserProfile เพื่อให้หน้าจัดการกำลังพลเปลี่ยนตามทันที
+            try:
+                # ดึงข้อมูล Profile ของคนที่กำลังแสกนหน้า
+                profile, _ = UserProfile.objects.get_or_create(user=request.user)
+                
+                if action == 'checkin':
+                    profile.person_status = 'normal'  # เมื่อเช็คอินสำเร็จ -> เปลี่ยนสถานะเป็น "ปกติ"
+                elif action == 'checkout':
+                    profile.person_status = 'home'    # เมื่อเช็คเอาต์สำเร็จ -> เปลี่ยนสถานะเป็น "กลับบ้าน"
+                
+                profile.save()
+            except Exception as profile_err:
+                print("PROFILE UPDATE ERROR:", profile_err)
+
+            # 2. ส่งการแจ้งเตือนเข้าไปยังระบบ LINE
             try:
                 notify_line_return_status(
                     trigger_record=record
@@ -766,7 +779,7 @@ def checkin_view(request):
 
     google_maps_api_key = getattr(
         settings,
-        'GOOGLE_MAPS_API_KEY',
+        'AIzaSyAdEA5DMsDjS26MJotjMxeXkDRxbZZo_dY',
         ''
     )
 
@@ -842,7 +855,7 @@ def manage_users(request):
         'search_query': search_query,
         'filter_company': filter_company,
         'company_choices': UserProfile.COMPANY_CHOICES,
-        'status_choices': UserProfile.STATUS_CHOICES,
+        'status_choices': UserProfile.PERSON_STATUS_CHOICES,
     }
 
     return render(

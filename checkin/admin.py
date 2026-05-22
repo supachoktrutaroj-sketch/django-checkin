@@ -13,17 +13,21 @@ from .models import (
 @admin.register(CheckInRecord)
 class CheckInRecordAdmin(admin.ModelAdmin):
 
+    # 🛠️ แก้ไข: เปลี่ยน 'distance' เป็น 'distance_meters' และเพิ่มฟิลด์ตรวจสอบสแกนใบหน้าลงหน้า Admin
     list_display = (
         'user',
         'action',
         'status',
-        'distance',
+        'distance_meters',
+        'verification_method',
+        'confidence_score',
         'created_at'
     )
 
     list_filter = (
         'action',
         'status',
+        'verification_method',
         'created_at'
     )
 

@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
 
-
 class CheckInRecord(models.Model):
 
     ACTION_CHOICES = [
@@ -28,7 +27,8 @@ class CheckInRecord(models.Model):
 
     longitude = models.FloatField()
 
-    distance = models.FloatField(
+    # 🛠️ แก้ไข: เปลี่ยนชื่อเพื่อให้ตรงกับ views.py ที่ส่งมาเป็น distance_meters
+    distance_meters = models.FloatField(
         default=0
     )
 
@@ -36,6 +36,21 @@ class CheckInRecord(models.Model):
         max_length=10,
         choices=STATUS_CHOICES,
         default='present'
+    )
+
+    # 🛠️ เพิ่มใหม่: ฟิลด์เก็บประเภทการยืนยันตัวตน (เช่น 'face')
+    verification_method = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        default='face'
+    )
+
+    # 🛠️ เพิ่มใหม่: ฟิลด์เก็บคะแนนความมั่นใจใบหน้าจากการสแกน
+    confidence_score = models.FloatField(
+        default=0.0,
+        blank=True,
+        null=True
     )
 
     created_at = models.DateTimeField(
