@@ -3,6 +3,7 @@ import json
 import math
 import urllib.request
 import urllib.error
+import pytz
 from datetime import datetime
 
 from django.conf import settings
@@ -502,8 +503,45 @@ def dashboard(request):
         'dashboard.html',
         context
     )
+@login_required
+@user_passes_test(is_admin_or_staff)
+def time_settings_view(request):
+    # ดึงข้อมูลตั้งค่าแถวแรกสุดขึ้นมา (ถ้าไม่มีระบบจะสร้างให้โดยอัตโนมัติ)
+    system_setting, _ = SystemSetting.objects.get_or_create(id=1)
 
+    if request.method == 'POST':
+        # รับค่าข้อความเวลาที่แอดมินพิมพ์ (เช่น "08:00")
+        checkin_start = request.POST.get('checkin_start_time')
+        late_time = request.POST.get('late_time')
+        
+        try:
+            # 定กำหนดเขตเวลาให้เป็นของประเทศไทย (Asia/Bangkok)
+            bangkok_tz = pytz.timezone('Asia/Bangkok')
+            today_str = datetime.today().strftime('%Y-%m-%d')
 
+            if checkin_start:
+                # นำเวลาที่พิมพ์มารวมกับวันที่ปัจจุบัน เพื่อแปลงเป็นรูปแบบ DateTime ที่มี Timezone ไทย
+                naive_start = datetime.strptime(f"{today_str} {checkin_start}", "%Y-%m-%d %H:%M")
+                aware_start = timezone.make_aware(naive_start, bangkok_tz)
+                system_setting.checkin_start_time = aware_start.time()
+
+            if late_time:
+                # ทำแบบเดียวกันกับเวลาสาย เพื่อบล็อกไม่ให้เวลาขยับเพี้ยน
+                naive_late = datetime.strptime(f"{today_str} {late_time}", "%Y-%m-%d %H:%M")
+                aware_late = timezone.make_aware(naive_late, bangkok_tz)
+                system_setting.late_time = aware_late.time()
+                
+            system_setting.save()
+            messages.success(request, '💾 อัปเดตการตั้งค่าเวลาเข้างานตรงตามที่พิมพ์เรียบร้อยแล้ว!')
+            return redirect('admin_dashboard')
+            
+        except Exception as e:
+            messages.error(request, f'เกิดข้อผิดพลาดในการบันทึก (กรุณาเช็คฟอร์ม): {str(e)}')
+
+    context = {
+        'system_setting': system_setting,
+    }
+    return render(request, 'time_settings.html', context)
 @login_required
 def history_view(request):
 

@@ -70,11 +70,36 @@
         box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
     }
 
+    /* 🛠️ เพิ่มสไตล์จัดตำแหน่งให้หัวข้อและปุ่มตั้งค่าอยู่แนวเดียวกัน */
+    .box-header-flex {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+    }
+
     .box-title {
         font-size: 24px;
         font-weight: 900;
-        margin-bottom: 18px;
         color: #0f172a;
+        margin: 0;
+    }
+
+    .btn-setting {
+        background: #1e3a8a;
+        color: white;
+        text-decoration: none;
+        padding: 10px 16px;
+        border-radius: 12px;
+        font-weight: 800;
+        font-size: 15px;
+        transition: 0.2s;
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.2);
+    }
+
+    .btn-setting:hover {
+        background: #3b82f6;
+        transform: translateY(-2px);
     }
 
     .setting-summary {
@@ -174,7 +199,6 @@
     }
 
     @media (max-width: 900px) {
-
         .stat-grid,
         .setting-summary {
             grid-template-columns: 1fr;
@@ -187,6 +211,12 @@
         .stat-number {
             font-size: 34px;
         }
+        
+        .box-header-flex {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
     }
 </style>
 
@@ -196,6 +226,14 @@
         ระบบแสดงรายชื่อผู้ที่ยังไม่เช็คอิน และข้อมูลเวลากลับเข้ากรมแบบเรียลไทม์
     </div>
 </div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-success text-center fw-bold mb-4" style="border-radius: 14px; padding: 14px;">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
 
 <div class="stat-grid">
     <div class="stat-card stat-blue">
@@ -215,7 +253,12 @@
 </div>
 
 <div class="box">
-    <div class="box-title">⏰ ข้อมูลเวลา</div>
+    <div class="box-header-flex">
+        <div class="box-title">⏰ ข้อมูลเวลา</div>
+        <a href="{% url 'time_settings' %}" class="btn-setting">
+            ⚙️ ตั้งค่าเวลากลับเข้ากรม
+        </a>
+    </div>
 
     <div class="setting-summary">
         <div class="time-pill">

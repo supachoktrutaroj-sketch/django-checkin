@@ -3,98 +3,144 @@
 {% block content %}
 <style>
     .page-wrap {
-        max-width: 700px;
-        margin: 30px auto;
+        max-width: 600px;
+        margin: 40px auto;
+        padding: 0 20px;
     }
 
     .card {
         background: white;
-        border-radius: 18px;
-        padding: 24px;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        border-radius: 20px;
+        padding: 35px;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
+        border: none;
     }
 
     .title {
-        font-size: 24px;
-        font-weight: bold;
+        font-size: 26px;
+        font-weight: 900;
         margin-bottom: 8px;
+        color: #0f172a;
     }
 
     .subtitle {
         color: #6b7280;
-        margin-bottom: 20px;
+        margin-bottom: 30px;
+        font-weight: 500;
+        font-size: 15px;
+        line-height: 1.5;
     }
 
     .form-group {
-        margin-bottom: 16px;
+        margin-bottom: 24px;
     }
 
     .form-group label {
         display: block;
-        font-weight: bold;
-        margin-bottom: 6px;
+        font-weight: 800;
+        margin-bottom: 10px;
+        color: #1e293b;
+        font-size: 16px;
     }
 
-    .form-group input {
+    .form-group label span {
+        font-size: 13px;
+        color: #64748b;
+        font-weight: 500;
+        margin-left: 5px;
+    }
+
+    .time-text-input {
         width: 100%;
         box-sizing: border-box;
-        padding: 12px;
-        border: 1px solid #d1d5db;
-        border-radius: 10px;
+        padding: 14px 18px;
+        border: 2px solid #cbd5e1;
+        border-radius: 12px;
+        font-size: 18px;
+        font-weight: 700;
+        color: #1e3a8a;
+        background-color: #f8fafc;
+        transition: all 0.2s;
+    }
+
+    .time-text-input:focus {
+        outline: none;
+        border-color: #2563eb;
+        background-color: #ffffff;
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
     }
 
     .btn-row {
         display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-        margin-top: 20px;
+        gap: 14px;
+        margin-top: 35px;
     }
 
     .btn {
-        padding: 12px 16px;
-        border-radius: 10px;
+        flex: 1;
+        padding: 14px 20px;
+        border-radius: 12px;
         text-decoration: none;
-        font-weight: bold;
+        font-weight: 800;
+        font-size: 16px;
         border: none;
         cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
     }
 
     .btn-primary {
         background: #2563eb;
         color: white;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-primary:hover {
+        background: #1d4ed8;
+        transform: translateY(-2px);
     }
 
     .btn-secondary {
-        background: #e5e7eb;
-        color: #111827;
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+    }
+
+    .btn-secondary:hover {
+        background: #e2e8f0;
+        color: #0f172a;
     }
 
     .alert {
-        padding: 12px;
-        border-radius: 10px;
-        margin-bottom: 16px;
-        font-weight: bold;
+        padding: 14px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        font-weight: 800;
+        text-align: center;
+        font-size: 15px;
     }
 
     .alert-success {
         background: #dcfce7;
-        color: #166534;
+        color: #166434;
+        border: 1px solid #bbf7d0;
     }
 
     .alert-error {
         background: #fee2e2;
         color: #991b1b;
+        border: 1px solid #fecaca;
     }
 </style>
 
 <div class="page-wrap">
     <div class="card">
         <div class="title">⏰ ตั้งค่าเวลาเข้ากรม</div>
-        <div class="subtitle">แอดมินสามารถตั้งเวลาเริ่มงาน เวลามาสาย และเวลากลับได้จากหน้านี้</div>
+        <div class="subtitle">พิมพ์ระบุเวลาเป็นระบบ 24 ชั่วโมงตรง ๆ คั่นด้วยเครื่องหมาย : (เช่น 08:00 หรือ 08:30)</div>
 
         {% if messages %}
         {% for message in messages %}
-        <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %}">
+        <div class="alert {% if 'success' in message.tags %}alert-success{% else %}alert-error{% endif %}">
             {{ message }}
         </div>
         {% endfor %}
@@ -104,26 +150,37 @@
             {% csrf_token %}
 
             <div class="form-group">
-                <label>เวลาเริ่มเข้างาน</label>
-                <input type="time" name="checkin_start_time" value="{{ setting.checkin_start_time|time:'H:i' }}"
-                    required>
+                <label>เวลาเริ่มเข้างาน <span>(เช่น 08:00)</span></label>
+                <input type="text" name="checkin_start_time" class="time-text-input"
+                       value="{{ system_setting.checkin_start_time|time:'H:i' }}"
+                       pattern="(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]" 
+                       placeholder="08:00" maxlength="5" oninput="autoFormatTime(this)" title="กรุณากรอกรูปแแบบเวลา 24 ชั่วโมง เช่น 08:00" required>
             </div>
 
             <div class="form-group">
-                <label>เวลาที่ถือว่ามาสาย</label>
-                <input type="time" name="late_time" value="{{ setting.late_time|time:'H:i' }}" required>
-            </div>
-
-            <div class="form-group">
-                <label>เวลากลับเข้ากรม/เวลาแจ้งเตือน</label>
-                <input type="time" name="return_deadline" value="{{ setting.return_deadline|time:'H:i' }}" required>
+                <label>เวลาที่ถือว่ามาสาย <span>(เช่น 08:30)</span></label>
+                <input type="text" name="late_time" class="time-text-input"
+                       value="{{ system_setting.late_time|time:'H:i' }}"
+                       pattern="(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]" 
+                       placeholder="08:30" maxlength="5" oninput="autoFormatTime(this)" title="กรุณากรอกรูปแแบบเวลา 24 ชั่วโมง เช่น 08:30" required>
             </div>
 
             <div class="btn-row">
                 <button type="submit" class="btn btn-primary">💾 บันทึกเวลา</button>
-                <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary">← กลับไปหน้า Admin Dashboard</a>
+                <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary">← ยกเลิก</a>
             </div>
         </form>
     </div>
 </div>
+
+<script>
+function autoFormatTime(input) {
+    let val = input.value.replace(/\D/g, ''); // ลบสิ่งที่ไม่ใช่ตัวเลขออกชั่วคราว
+    if (val.length >= 3) {
+        input.value = val.slice(0, 2) + ':' + val.slice(2, 4);
+    } else {
+        input.value = val;
+    }
+}
+</script>
 {% endblock %}

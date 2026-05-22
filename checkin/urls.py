@@ -14,8 +14,8 @@ urlpatterns = [
 
     path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
     
-    # ⏱️ สลับไปเข้าหน้าแอดมินชั่วคราว (เนื่องจากใน views.py ยังไม่มีระบบตั้งเวลา)
-    path('time-settings/', views.admin_dashboard, name='time_settings'),
+    # ⏱️ 🛠️ แก้ไขใหม่: แยกไปเข้าหน้าฟังก์ชันตั้งเวลาโดยเฉพาะ (เลิกใช้หน้าแดชบอร์ดซ้ำกันแล้ว)
+    path('time-settings/', views.time_settings_view, name='time_settings'),
 
     # 📊 ซ่อน export_excel ชั่วคราว (เพราะใน views.py ไม่มีฟังก์ชันนี้) ระบบจะได้เปิดได้สักทีครับ
     path('export-excel/', views.admin_dashboard, name='export_excel'),
