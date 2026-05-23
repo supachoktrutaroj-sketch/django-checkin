@@ -61,11 +61,13 @@ class UserProfileInline(admin.StackedInline):
 
     can_delete = False
 
+    # 🛠️ แก้ไข: เปลี่ยนฟิลด์ 'return_date' เป็นฟิลด์ใหม่รายบุคคล พร้อมเพิ่มสถานะการกลับในหน้าต่าง Inline ของ User
     fields = (
         'phone_number',
         'company',
         'person_status',
-        'return_date',
+        'individual_return_deadline',
+        'return_status',
         'note',
         'created_at'
     )
@@ -129,12 +131,14 @@ admin.site.register(User, CustomUserAdmin)
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
 
+    # 🛠️ แก้ไข: อัปเดตคอลัมน์การแสดงผลให้เรียกฟิลด์วันเวลารายบุคคล และสถานะรายงานตัวมาแสดงบนตารางตารางแอดมินหลัก
     list_display = (
         'user',
         'phone_number',
         'company',
         'person_status',
-        'return_date',
+        'individual_return_deadline',
+        'return_status',
         'created_at'
     )
 
@@ -145,9 +149,11 @@ class UserProfileAdmin(admin.ModelAdmin):
         'phone_number'
     )
 
+    # ➕ เพิ่มตัวกรอง (Filter) ด้านขวามือให้แอดมินเลือกสับดูตามสถานะการกลับรายงานตัวได้สะดวกขึ้น
     list_filter = (
         'company',
-        'person_status'
+        'person_status',
+        'return_status'
     )
 
     ordering = (

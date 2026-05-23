@@ -30,16 +30,28 @@
         margin-bottom: 28px;
     }
 
+    .stat-link {
+        text-decoration: none;
+        display: block;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .stat-link:hover {
+        transform: translateY(-4px);
+    }
+
     .stat-card {
         color: white;
         padding: 26px;
         border-radius: 20px;
         box-shadow: 0 16px 35px rgba(15, 23, 42, 0.18);
         text-align: center;
+        position: relative;
     }
 
-    .stat-blue {
-        background: linear-gradient(135deg, #3b82f6, #1e40af);
+    .stat-active {
+        outline: 4px solid #0f172a;
+        outline-offset: 2px;
     }
 
     .stat-green {
@@ -48,6 +60,11 @@
 
     .stat-red {
         background: linear-gradient(135deg, #ef4444, #991b1b);
+    }
+
+    .stat-yellow {
+        background: linear-gradient(135deg, #f59e0b, #b45309);
+        color: white;
     }
 
     .stat-label {
@@ -70,12 +87,13 @@
         box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
     }
 
-    /* 🛠️ เพิ่มสไตล์จัดตำแหน่งให้หัวข้อและปุ่มตั้งค่าอยู่แนวเดียวกัน */
     .box-header-flex {
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 18px;
+        flex-wrap: wrap;
+        gap: 12px;
     }
 
     .box-title {
@@ -100,6 +118,21 @@
     .btn-setting:hover {
         background: #3b82f6;
         transform: translateY(-2px);
+    }
+
+    .btn-all {
+        background: #64748b;
+        color: white;
+        text-decoration: none;
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-weight: 800;
+        font-size: 14px;
+        transition: 0.2s;
+    }
+
+    .btn-all:hover {
+        background: #475569;
     }
 
     .setting-summary {
@@ -142,10 +175,10 @@
     }
 
     th {
-        background: linear-gradient(135deg, #dc2626, #991b1b);
+        background: linear-gradient(135deg, #1e293b, #0f172a);
         color: white;
         padding: 16px;
-        font-size: 17px;
+        font-size: 16px;
         font-weight: 900;
         letter-spacing: 0.3px;
     }
@@ -154,7 +187,7 @@
         padding: 16px;
         text-align: center;
         border-bottom: 1px solid #e5e7eb;
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 600;
     }
 
@@ -171,31 +204,67 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 34px;
-        height: 34px;
+        width: 32px;
+        height: 32px;
         border-radius: 999px;
-        background: #fee2e2;
-        color: #991b1b;
+        background: #f1f5f9;
+        color: #334155;
         font-weight: 900;
     }
 
     .username-pill {
         display: inline-block;
-        padding: 8px 14px;
+        padding: 6px 12px;
         border-radius: 999px;
-        background: #eff6ff;
-        color: #1e3a8a;
+        background: #f0fdf4;
+        color: #166534;
         font-weight: 900;
     }
 
+    .badge-status {
+        display: inline-block;
+        padding: 6px 14px;
+        border-radius: 10px;
+        font-weight: 800;
+        font-size: 14px;
+    }
+    .status-ok { background: #dcfce7; color: #166534; }
+    .status-late { background: #fee2e2; color: #991b1b; }
+    .status-wait { background: #fef3c7; color: #92400e; }
+
+    .company-badge {
+        background: #e0f2fe;
+        color: #0369a1;
+        padding: 6px 12px;
+        border-radius: 10px;
+        font-weight: 800;
+    }
+
     .empty-box {
-        background: #dcfce7;
-        color: #166534;
-        padding: 22px;
+        background: #f1f5f9;
+        color: #475569;
+        padding: 30px;
         border-radius: 16px;
-        font-size: 20px;
+        font-size: 18px;
         font-weight: 900;
         text-align: center;
+    }
+
+    .btn-action-leave {
+        background: #f59e0b;
+        color: white;
+        border: none;
+        padding: 6px 14px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    .btn-action-leave:hover {
+        background: #d97706;
+        transform: scale(1.05);
     }
 
     @media (max-width: 900px) {
@@ -223,7 +292,7 @@
 <div class="admin-header">
     <h2 class="admin-title">🛠️ Admin Dashboard</h2>
     <div class="admin-subtitle">
-        ระบบแสดงรายชื่อผู้ที่ยังไม่เช็คอิน และข้อมูลเวลากลับเข้ากรมแบบเรียลไทม์
+        ระบบแสดงรายชื่อแยกกลุ่ม และกำหนดข้อมูลเวลากลับเข้ากรมรายบุคคลแบบเรียลไทม์
     </div>
 </div>
 
@@ -236,25 +305,31 @@
 {% endif %}
 
 <div class="stat-grid">
-    <div class="stat-card stat-blue">
-        <div class="stat-label">เวลากลับเข้ากรม</div>
-        <div class="stat-number">{{ system_setting.return_deadline|time:"H:i" }}</div>
-    </div>
+    <a href="?filter=ON_TIME&company={{ company_filter }}" class="stat-link">
+        <div class="stat-card stat-green {% if status_filter == 'ON_TIME' %}stat-active{% endif %}">
+            <div class="stat-label">กลับทันเวลา ✅</div>
+            <div class="stat-number">{{ total_on_time }}</div>
+        </div>
+    </a>
 
-    <div class="stat-card stat-green">
-        <div class="stat-label">สถานะเวลา</div>
-        <div class="stat-number" id="status-text">--</div>
-    </div>
+    <a href="?filter=LATE&company={{ company_filter }}" class="stat-link">
+        <div class="stat-card stat-red {% if status_filter == 'LATE' %}stat-active{% endif %}">
+            <div class="stat-label">กลับไม่ทันเวลา (สาย) ❌</div>
+            <div class="stat-number">{{ total_late }}</div>
+        </div>
+    </a>
 
-    <div class="stat-card stat-red">
-        <div class="stat-label">ยังไม่เช็คอิน</div>
-        <div class="stat-number">{{ not_checkedin_users|length }}</div>
-    </div>
+    <a href="?filter=PENDING&company={{ company_filter }}" class="stat-link">
+        <div class="stat-card stat-yellow {% if status_filter == 'PENDING' %}stat-active{% endif %}">
+            <div class="stat-label">ยังไม่รายงานตัว ⏳</div>
+            <div class="stat-number">{{ total_pending }}</div>
+        </div>
+    </a>
 </div>
 
 <div class="box">
     <div class="box-header-flex">
-        <div class="box-title">⏰ ข้อมูลเวลา</div>
+        <div class="box-title">⏰ ข้อมูลเวลากลางประจำหน่วย</div>
         <a href="{% url 'time_settings' %}" class="btn-setting">
             ⚙️ ตั้งค่าเวลากลับเข้ากรม
         </a>
@@ -262,7 +337,7 @@
 
     <div class="setting-summary">
         <div class="time-pill">
-            เวลากลับเข้ากรม<br>
+            เวลากลับเข้ากรมส่วนกลาง<br>
             {{ system_setting.return_deadline|time:"H:i" }} น.
         </div>
 
@@ -278,37 +353,217 @@
 </div>
 
 <div class="box">
-    <div class="box-title">🚨 รายชื่อคนที่ยังไม่มา / ยังไม่เช็คอิน</div>
+    <div class="box-header-flex">
+        <div class="box-title">🚨 {{ table_title }}</div>
+        
+        <form method="GET" class="d-flex gap-2 align-items-center" style="display: flex; gap: 8px;">
+            <input type="hidden" name="filter" value="{{ status_filter }}">
+            <select name="company" style="padding: 8px 12px; font-weight: 800; border-radius: 10px; border: 1px solid #cbd5e1;" onchange="this.form.submit()">
+                <option value="">-- กองร้อยทั้งหมด --</option>
+                <option value="ร้อย.1" {% if company_filter == 'ร้อย.1' %}selected{% endif %}>กองร้อยที่ 1</option>
+                <option value="ร้อย.2" {% if company_filter == 'ร้อย.2' %}selected{% endif %}>กองร้อยที่ 2</option>
+                <option value="ร้อย.3" {% if company_filter == 'ร้อย.3' %}selected{% endif %}>กองร้อยที่ 3</option>
+                <option value="ร้อย.4" {% if company_filter == 'ร้อย.4' %}selected{% endif %}>กองร้อยที่ 4</option>
+                <option value="ร้อย.สสห." {% if company_filter == 'ร้อย.สสห.' %}selected{% endif %}>กองร้อยสนับสนุน (ร้อย.สสห.)</option>
+            </select>
+            <a href="?filter=ALL" class="btn-all">ดูรายชื่อทั้งหมด</a>
+        </form>
+    </div>
 
-    {% if not_checkedin_users %}
+    {% if display_users %}
     <div class="table-wrap">
         <table>
-            <tr>
-                <th>#</th>
-                <th>ชื่อผู้ใช้</th>
-                <th>ชื่อ</th>
-                <th>นามสกุล</th>
-            </tr>
+            <thead>
+                <tr>
+                    <th style="width: 70px;">#</th>
+                    <th>ชื่อผู้ใช้</th>
+                    <th>ชื่อ - นามสกุล</th>
+                    <th>กองร้อย</th>
+                    <th>วัน - เวลา ปล่อยตัว</th>
+                    <th>กำหนดเวลากลับ (รายบุคคล)</th>
+                    <th>นับถอยหลัง</th>
+                    <th>สถานะล่าสุด</th>
+                    <th>จัดการข้อมูล</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for up in display_users %}
+                <tr>
+                    <td><span class="number-badge">{{ forloop.counter }}</span></td>
+                    <td><span class="username-pill">{{ up.user.username }}</span></td>
+                    <td style="text-align: left; padding-left: 24px;">{{ up.full_name }}</td>
+                    <td><span class="company-badge">{{ up.get_company_display_thai }}</span></td>
+                    
+                    <td style="color: #475569; font-weight: 600;">
+                        {% if up.start_date %}
+                            {{ up.start_date|date:"d M Y" }}
+                            {% if up.individual_return_deadline %}
+                                <div class="text-muted small fw-bold" style="margin-top: 2px;">
+                                    ⏰ {{ up.individual_return_deadline|date:"H:i" }} น.
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted" style="font-weight: 500;">-</span>
+                        {% endif %}
+                    </td>
 
-            {% for user in not_checkedin_users %}
-            <tr>
-                <td><span class="number-badge">{{ forloop.counter }}</span></td>
-                <td><span class="username-pill">{{ user.username }}</span></td>
-                <td>{{ user.first_name|default:"-" }}</td>
-                <td>{{ user.last_name|default:"-" }}</td>
-            </tr>
-            {% endfor %}
+                    <td style="color: #1e3a8a; font-weight: 800;">
+                        {% if up.individual_return_deadline %}
+                            {{ up.individual_return_deadline|date:"d M Y - H:i" }} น.
+                        {% else %}
+                            <span class="text-muted" style="font-weight: 500;">ยังไม่ได้กำหนด</span>
+                        {% endif %}
+                    </td>
+
+                    <td style="font-weight: 700; font-size: 14px; color: #475569;">
+                        {{ up.get_days_remaining }}
+                    </td>
+
+                    <td>
+                        {% if up.return_status == 'ON_TIME' %}
+                            <span class="badge-status status-ok">✅ ทันเวลา</span>
+                        {% elif up.return_status == 'LATE' %}
+                            <span class="badge-status status-late">❌ ไม่ทันเวลา</span>
+                        {% else %}
+                            <span class="badge-status status-wait">⏳ ยังไม่กลับ</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button type="button" class="btn-action-leave" 
+                                onclick='openLeaveModal("{{ up.user.id }}", "{{ up.full_name|escapejs }}", "{{ up.start_date|date:"Y-m-d" }}", "{{ up.individual_return_deadline|date:"H:i" }}")'>
+                            ⚙️ ตั้งค่าวันลา
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
     </div>
     {% else %}
-    <div class="empty-box">✅ ทุกคนเช็คอินแล้ว</div>
+    <div class="empty-box">🪖 ไม่มีรายชื่อกำลังพลในกลุ่มที่เลือกตรวจ ณ ขณะนี้</div>
     {% endif %}
 </div>
 
+<div class="modal fade" id="universalLeaveModal" tabindex="-1" aria-labelledby="universalLeaveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 20px; border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
+            <div class="modal-header" style="background: #0f172a; color: white; border-top-left-radius: 20px; border-top-right-radius: 20px;">
+                <h5 class="modal-title fw-bold" id="universalLeaveModalLabel">🪖 ตั้งค่าช่วงเวลาออกกรม</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="modalLeaveForm" method="POST" action="">
+                {% csrf_token %}
+                <div class="modal-body p-4 text-start">
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary small">วันที่เริ่มปล่อยตัว</label>
+                            <input type="date" name="start_date" id="modalStartDate" class="form-control" style="border-radius: 10px;" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary small">เวลาที่ปล่อยตัว</label>
+                            <input type="time" name="start_time" id="modalStartTime" class="form-control" style="border-radius: 10px;" required>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary small">จำนวนวันลาพัก / ไปราชการ</label>
+                            <input type="number" name="leave_days" id="modalLeaveDays" class="form-control" style="border-radius: 10px;" min="0" value="1" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small" style="color: #1e3a8a;">⏰ เวลาที่ต้องกลับเข้ากรม</label>
+                            <input type="time" name="return_time" id="modalReturnTime" class="form-control" style="border-radius: 10px; border: 2px solid #93c5fd;" required>
+                        </div>
+                    </div>
+                    <div class="form-text text-muted mb-3">ระบบจะคำนวณวันขากลับให้อัตโนมัติ โดยยึดตาม "เวลาที่ต้องกลับเข้ากรม" ด้านบนนี้</div>
+
+                    <div id="live-preview-return" class="alert alert-primary mt-3 small fw-bold" style="display:none; border-radius: 10px; background-color: #f0fdf4; border: 1px solid #bbf7d0; color: #166534;">
+                        🎯 กำหนดเวลากลับเข้ากรม: <span id="preview-date-text">--</span>
+                    </div>
+                </div>
+                <div class="modal-footer p-3" style="background: #f8fafc; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;">
+                    <button type="button" class="btn btn-secondary fw-bold" style="border-radius: 10px;" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary fw-bold" style="border-radius: 10px; background: #1e3a8a; border: none;">💾 บันทึกข้อมูล</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
 <script>
+    function openLeaveModal(userId, fullName, currentDate, currentTime) {
+        const form = document.getElementById('modalLeaveForm');
+        form.action = `/manage-users/save-leave/${userId}/`;
+
+        document.getElementById('universalLeaveModalLabel').innerText = '🪖 ตั้งค่าช่วงเวลาออกกรม: ' + fullName;
+        
+        if (currentDate && currentDate !== 'None' && currentDate !== '') {
+            document.getElementById('modalStartDate').value = currentDate;
+        } else {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('modalStartDate').value = today;
+        }
+
+        if (currentTime && currentTime !== 'None' && currentTime !== '') {
+            document.getElementById('modalStartTime').value = currentTime;
+            document.getElementById('modalReturnTime').value = currentTime;
+        } else {
+            document.getElementById('modalStartTime').value = '08:00';
+            document.getElementById('modalReturnTime').value = '18:00';
+        }
+
+        setTimeout(calculateReturn, 100);
+        
+        var myModal = new bootstrap.Modal(document.getElementById('universalLeaveModal'));
+        myModal.show();
+    }
+
+    function calculateReturn() {
+        const startDateInput = document.getElementById('modalStartDate');
+        const leaveDaysInput = document.getElementById('modalLeaveDays');
+        const returnTimeInput = document.getElementById('modalReturnTime'); 
+        const previewBox = document.getElementById('live-preview-return');
+        const previewText = document.getElementById('preview-date-text');
+
+        if (!startDateInput.value || leaveDaysInput.value === '') {
+            previewBox.style.display = 'none';
+            return;
+        }
+
+        const startDate = new Date(startDateInput.value);
+        const days = parseInt(leaveDaysInput.value) || 0;
+        
+        startDate.setDate(startDate.getDate() + days);
+
+        const day = String(startDate.getDate()).padStart(2, '0');
+        const month = String(startDate.getMonth() + 1).padStart(2, '0');
+        const year = startDate.getFullYear() + 543; 
+        
+        const returnTime = returnTimeInput.value || "18:00"; 
+
+        previewText.innerText = `${day}/${month}/${year} เวลา ${returnTime} น.`;
+        previewBox.style.display = 'block';
+    }
+
+    function setupModalLivePreview() {
+        const startDateInput = document.getElementById('modalStartDate');
+        const leaveDaysInput = document.getElementById('modalLeaveDays');
+        const returnTimeInput = document.getElementById('modalReturnTime'); 
+
+        startDateInput.addEventListener('change', calculateReturn);
+        leaveDaysInput.addEventListener('input', calculateReturn);
+        returnTimeInput.addEventListener('input', calculateReturn); 
+    }
+
     function updateClock() {
         const now = new Date();
         const deadlineText = "{{ system_setting.return_deadline|time:'H:i' }}";
+        if (!deadlineText || deadlineText === "None") return;
+        
         const [h, m] = deadlineText.split(":").map(Number);
 
         const deadline = new Date();
@@ -322,33 +577,31 @@
         const mm = String(now.getMinutes()).padStart(2, '0');
         const ss = String(now.getSeconds()).padStart(2, '0');
 
-        document.getElementById("realtime-datetime").textContent =
-            `${day}/${month}/${year} ${hh}:${mm}:${ss}`;
+        const dateTimeEl = document.getElementById("realtime-datetime");
+        if (dateTimeEl) {
+            dateTimeEl.textContent = `${day}/${month}/${year} ${hh}:${mm}:${ss}`;
+        }
 
         const el = document.getElementById("deadline-status");
-        const statusText = document.getElementById("status-text");
-
-        if (now > deadline) {
-            const diff = Math.floor((now - deadline) / 60000);
-
-            el.innerHTML = `❌ เลยเวลาแล้ว<br><b>${diff}</b> นาที`;
-            el.style.background = "#fee2e2";
-            el.style.color = "#991b1b";
-
-            statusText.textContent = "เลยเวลา";
-        } else {
-            const diff = Math.floor((deadline - now) / 60000);
-
-            el.innerHTML = `⏳ เหลืออีก<br><b>${diff}</b> นาที`;
-            el.style.background = "#dcfce7";
-            el.style.color = "#166534";
-
-            statusText.textContent = "ปกติ";
+        if (el) {
+            if (now > deadline) {
+                const diff = Math.floor((now - deadline) / 60000);
+                el.innerHTML = `❌ เลยเวลากลางแล้ว<br><b>${diff}</b> นาที`;
+                el.style.background = "#fee2e2";
+                el.style.color = "#991b1b";
+            } else {
+                const diff = Math.floor((deadline - now) / 60000);
+                el.innerHTML = `⏳ เหลือนับถอยหลัง<br><b>${diff}</b> นาที`;
+                el.style.background = "#dcfce7";
+                el.style.color = "#166534";
+            }
         }
     }
 
-    updateClock();
-    setInterval(updateClock, 1000);
+    document.addEventListener('DOMContentLoaded', function() {
+        setupModalLivePreview();
+        updateClock();
+        setInterval(updateClock, 1000);
+    });
 </script>
-
 {% endblock %}

@@ -4,7 +4,7 @@ import math
 import urllib.request
 import urllib.error
 import pytz
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.contrib import messages
@@ -160,24 +160,20 @@ def calculate_status(checkin_datetime):
 
 @csrf_exempt
 def line_webhook(request):
-
     if request.method == 'POST':
         try:
             body = json.loads(
                 request.body.decode('utf-8')
             )
-
             print("LINE EVENT:", body)
-
         except Exception as e:
             print("LINE ERROR:", str(e))
 
         return JsonResponse({'status': 'ok'})
-
     return JsonResponse({'message': 'ok'})
 
-def build_line_summary_message(trigger_record=None):
 
+def build_line_summary_message(trigger_record=None):
     today = timezone.localdate()
 
     checked_count = (
@@ -197,18 +193,15 @@ def build_line_summary_message(trigger_record=None):
     ).count()
 
     not_checked_count = max(total_users - checked_count, 0)
-
     lines = []
 
     if trigger_record:
-
         action_text = (
             'เช็คอิน'
             if trigger_record.action == 'checkin'
             else 'เช็คเอาต์'
         )
 
-        # 💡 ดึงชื่อจริง (first_name) มาแสดงผล ถ้าไม่มีค่อยใช้ username
         display_name = trigger_record.user.first_name or trigger_record.user.username
 
         lines.append("📢 มีการอัปเดต")
@@ -217,19 +210,16 @@ def build_line_summary_message(trigger_record=None):
         lines.append(
             f"เวลา: {timezone.localtime(trigger_record.created_at).strftime('%H:%M:%S')}"
         )
-
         lines.append("")
 
-    # 📊 ปรับเปลี่ยนข้อความแสดงผลสรุปยอดตามที่คุณต้องการ
     lines.append(f"✅ มาแล้ว: {checked_count} คน")
-    lines.append(f"❌ ไม่มา: {not_checked_count} คน")
-    lines.append(f"📊 ทั้งหมด: {total_users} คน") # 👈 เพิ่มบรรทัดนี้เข้าไป
+    lines.append(f"❌ 不มา: {not_checked_count} คน")
+    lines.append(f"📊 ทั้งหมด: {total_users} คน")
 
     return "\n".join(lines)
 
 
 def send_line_push_message(message_text):
-
     channel_access_token = getattr(
         settings,
         'LINE_CHANNEL_ACCESS_TOKEN',
@@ -272,12 +262,10 @@ def send_line_push_message(message_text):
             req,
             timeout=15
         ) as response:
-
             return True, response.read().decode(
                 "utf-8",
                 errors="ignore"
             )
-
     except urllib.error.HTTPError as e:
         try:
             detail = e.read().decode(
@@ -286,15 +274,12 @@ def send_line_push_message(message_text):
             )
         except Exception:
             detail = str(e)
-
         return False, detail
-
     except Exception as e:
         return False, str(e)
 
 
 def notify_line_return_status(trigger_record=None):
-
     message_text = build_line_summary_message(
         trigger_record=trigger_record
     )
@@ -319,44 +304,19 @@ def notify_line_return_status(trigger_record=None):
 # ====================================================
 
 def register_view(request):
-
     if request.user.is_authenticated:
         return redirect('dashboard')
 
     if request.method == 'POST':
-
-        first_name = request.POST.get(
-            'first_name',
-            ''
-        ).strip()
-
-        last_name = request.POST.get(
-            'last_name',
-            ''
-        ).strip()
-
-        username = request.POST.get(
-            'username',
-            ''
-        ).strip()
-
-        phone_number = request.POST.get(
-            'phone_number',
-            ''
-        ).strip()
-
-        company = request.POST.get(
-            'company',
-            ''
-        ).strip()
-
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        username = request.POST.get('username', '').strip()
+        phone_number = request.POST.get('phone_number', '').strip()
+        company = request.POST.get('company', '').strip()
         password1 = request.POST.get('password1')
         password2 = request.POST.get('password2')
 
-        if User.objects.filter(
-            username=username
-        ).exists():
-
+        if User.objects.filter(username=username).exists():
             return render(request, 'register.html', {
                 'error': 'Username ถูกใช้แล้ว'
             })
@@ -384,19 +344,16 @@ def register_view(request):
         )
 
         login(request, user)
-
         return redirect('face_register')
 
     return render(request, 'register.html')
 
 
 def login_view(request):
-
     if request.user.is_authenticated:
         return redirect('dashboard')
 
     if request.method == 'POST':
-
         username = request.POST.get('username')
         password = request.POST.get('password')
 
@@ -407,9 +364,7 @@ def login_view(request):
         )
 
         if user:
-
             login(request, user)
-
             if user.is_superuser:
                 return redirect('dashboard')
 
@@ -445,7 +400,6 @@ def home(request):
 
 @login_required
 def dashboard(request):
-
     today = timezone.localdate()
 
     raw_data = (
@@ -459,18 +413,9 @@ def dashboard(request):
         created_at__date=today
     )
 
-    total_checkin = today_records.filter(
-        action='checkin'
-    ).count()
-
-    late_count = today_records.filter(
-        action='checkin',
-        status='late'
-    ).count()
-
-    checkout_count = today_records.filter(
-        action='checkout'
-    ).count()
+    total_checkin = today_records.filter(action='checkin').count()
+    late_count = today_records.filter(action='checkin', status='late').count()
+    checkout_count = today_records.filter(action='checkout').count()
 
     total_users = User.objects.filter(
         is_superuser=False,
@@ -485,10 +430,7 @@ def dashboard(request):
         .count()
     )
 
-    not_checked_in = max(
-        total_users - checked_today,
-        0
-    )
+    not_checked_in = max(total_users - checked_today, 0)
 
     context = {
         'data': raw_data,
@@ -498,35 +440,28 @@ def dashboard(request):
         'not_checked_in': not_checked_in,
     }
 
-    return render(
-        request,
-        'dashboard.html',
-        context
-    )
+    return render(request, 'dashboard.html', context)
+
+
 @login_required
 @user_passes_test(is_admin_or_staff)
 def time_settings_view(request):
-    # ดึงข้อมูลตั้งค่าแถวแรกสุดขึ้นมา (ถ้าไม่มีระบบจะสร้างให้โดยอัตโนมัติ)
     system_setting, _ = SystemSetting.objects.get_or_create(id=1)
 
     if request.method == 'POST':
-        # รับค่าข้อความเวลาที่แอดมินพิมพ์ (เช่น "08:00")
         checkin_start = request.POST.get('checkin_start_time')
         late_time = request.POST.get('late_time')
         
         try:
-            # 定กำหนดเขตเวลาให้เป็นของประเทศไทย (Asia/Bangkok)
             bangkok_tz = pytz.timezone('Asia/Bangkok')
             today_str = datetime.today().strftime('%Y-%m-%d')
 
             if checkin_start:
-                # นำเวลาที่พิมพ์มารวมกับวันที่ปัจจุบัน เพื่อแปลงเป็นรูปแบบ DateTime ที่มี Timezone ไทย
                 naive_start = datetime.strptime(f"{today_str} {checkin_start}", "%Y-%m-%d %H:%M")
                 aware_start = timezone.make_aware(naive_start, bangkok_tz)
                 system_setting.checkin_start_time = aware_start.time()
 
             if late_time:
-                # ทำแบบเดียวกันกับเวลาสาย เพื่อบล็อกไม่ให้เวลาขยับเพี้ยน
                 naive_late = datetime.strptime(f"{today_str} {late_time}", "%Y-%m-%d %H:%M")
                 aware_late = timezone.make_aware(naive_late, bangkok_tz)
                 system_setting.late_time = aware_late.time()
@@ -536,54 +471,41 @@ def time_settings_view(request):
             return redirect('admin_dashboard')
             
         except Exception as e:
-            messages.error(request, f'เกิดข้อผิดพลาดในการบันทึก (กรุณาเช็คฟอร์ม): {str(e)}')
+            messages.error(request, f'เกิดข้อผิดพลาดในการบันทึก: {str(e)}')
 
     context = {
         'system_setting': system_setting,
     }
     return render(request, 'time_settings.html', context)
+
+
 @login_required
 def history_view(request):
-
     data = (
         CheckInRecord.objects
         .filter(user=request.user)
         .order_by('-created_at')
     )
-
-    return render(request, 'history.html', {
-        'data': data
-    })
+    return render(request, 'history.html', {'data': data})
 
 
 @login_required
 def profile_view(request):
-
-    profile, _ = UserProfile.objects.get_or_create(
-        user=request.user
-    )
-
-    return render(request, 'profile.html', {
-        'profile': profile
-    })
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    return render(request, 'profile.html', {'profile': profile})
 
 
 # ====================================================
-# Face Recognition
+# Face Recognition & Checkin
 # ====================================================
 
 @login_required
 def face_register_page(request):
-
-    profile, _ = UserFaceProfile.objects.get_or_create(
-        user=request.user
-    )
-
+    profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
     return render(request, 'face_register.html', {
-        'has_face_registered': bool(
-            profile.face_descriptor
-        )
+        'has_face_registered': bool(profile.face_descriptor)
     })
+
 
 @login_required
 def face_verify_page(request):
@@ -597,39 +519,25 @@ def face_verify_page(request):
         'has_face_registered': bool(profile.face_descriptor),
         'saved_descriptor': profile.face_descriptor if profile.face_descriptor else '[]',
     }
-
     return render(request, 'face_verify.html', context)
+
+
 @login_required
 @require_POST
 def save_face_descriptor(request):
-
     try:
-
-        data = json.loads(
-            request.body.decode('utf-8')
-        )
-
+        data = json.loads(request.body.decode('utf-8'))
         descriptor = data.get('descriptor')
 
         if not is_valid_face_descriptor(descriptor):
+            return JsonResponse({'success': False, 'message': 'ข้อมูลใบหน้าไม่ถูกต้อง'})
 
-            return JsonResponse({
-                'success': False,
-                'message': 'ข้อมูลใบหน้าไม่ถูกต้อง'
-            })
-
-        profile, _ = UserFaceProfile.objects.get_or_create(
-            user=request.user
-        )
+        profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
 
         if profile.face_descriptor:
-            return JsonResponse({
-                'success': False,
-                'message': 'บัญชีนี้ลงทะเบียนแล้ว'
-            })
+            return JsonResponse({'success': False, 'message': 'บัญชีนี้ลงทะเบียนแล้ว'})
 
         duplicate_threshold = 0.45
-
         other_profiles = (
             UserFaceProfile.objects
             .exclude(user=request.user)
@@ -638,94 +546,43 @@ def save_face_descriptor(request):
         )
 
         for other in other_profiles:
-
             try:
-                old_descriptor = json.loads(
-                    other.face_descriptor
-                )
-
-                distance = calculate_face_distance(
-                    descriptor,
-                    old_descriptor
-                )
-
+                old_descriptor = json.loads(other.face_descriptor)
+                distance = calculate_face_distance(descriptor, old_descriptor)
                 if distance < duplicate_threshold:
-
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'ใบหน้านี้ถูกใช้แล้ว'
-                    })
-
+                    return JsonResponse({'success': False, 'message': 'ใบหน้านี้ถูกใช้แล้ว'})
             except Exception:
                 continue
 
-        profile.face_descriptor = json.dumps(
-            descriptor
-        )
-
+        profile.face_descriptor = json.dumps(descriptor)
         profile.face_registered_at = timezone.now()
-
         profile.save()
 
-        return JsonResponse({
-            'success': True
-        })
-
+        return JsonResponse({'success': True})
     except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})
 
-        return JsonResponse({
-            'success': False,
-            'message': str(e)
-        })
-
-
-# ====================================================
-# Checkin
-# ====================================================
 
 @login_required
 def checkin_view(request):
-
     setting = get_system_setting()
-
     OFFICE_LAT = float(setting.latitude)
     OFFICE_LON = float(setting.longitude)
-
     ALLOWED_RADIUS = 500.0
-
     LOCATION_NAME = "หน่วยงาน"
 
     if request.method == 'POST':
-
-        action = request.POST.get(
-            'action',
-            'checkin'
-        )
-
-        verification_method = request.POST.get(
-            'verification_method',
-            'face'
-        )
-
-        confidence_score = request.POST.get(
-            'confidence_score',
-            0
-        )
-
+        action = request.POST.get('action', 'checkin')
+        verification_method = request.POST.get('verification_method', 'face')
+        confidence_score = request.POST.get('confidence_score', 0)
         user_lat = request.POST.get('latitude')
         user_lon = request.POST.get('longitude')
 
         if not user_lat or not user_lon:
-
-            messages.error(
-                request,
-                'ไม่พบ GPS'
-            )
-
+            messages.error(request, 'ไม่พบ GPS')
             return redirect('checkin')
 
         try:
-# 🛠️ จุดที่เพิ่มใหม่: เช็คว่าวันนี้คนๆ นี้เคยเช็คอิน (action='checkin') ไปแล้วหรือยัง
             if action == 'checkin':
                 today = timezone.localdate()
                 already_checked_in = CheckInRecord.objects.filter(
@@ -735,19 +592,19 @@ def checkin_view(request):
                 ).exists()
 
                 if already_checked_in:
-                    # ถ้าเคยเช็คอินไปแล้วในวันนี้ ให้แจ้งเตือนฝั่งหน้าเว็บและเด้งกลับทันที ไม่บันทึกซ้ำ
-                    messages.error(
-                        request,
-                        'วันนี้คุณได้ทำการเช็คอินไปเรียบร้อยแล้ว ไม่สามารถเช็คอินซ้ำได้'
-                    )
+                    messages.error(request, 'วันนี้คุณได้ทำการเช็คอินไปเรียบร้อยแล้ว ไม่สามารถเช็คอินซ้ำได้')
                     return redirect('checkin')
 
-            # ---------------------------------------------------------------------
-            # (โค้ดเดิมด้านล่าง) ทำงานตามปกติหากผ่านเงื่อนไขด้านบน หรือถ้าเลือกสแกน 'checkout'
+            # 🛠️ ซ่อมบั๊กตัวแปรหาย: ประกาศคำนวณระยะทางและสถานะส่งไปเก็บใน Record
+            user_lat_float = float(user_lat)
+            user_lon_float = float(user_lon)
+            distance = calculate_distance(user_lat_float, user_lon_float, OFFICE_LAT, OFFICE_LON)
+            status = calculate_status(timezone.now())
+
             record = CheckInRecord.objects.create(
                 user=request.user,
-                latitude=float(user_lat),
-                longitude=float(user_lon),
+                latitude=user_lat_float,
+                longitude=user_lon_float,
                 action=action,
                 status=status,
                 verification_method=verification_method,
@@ -755,115 +612,37 @@ def checkin_view(request):
                 distance_meters=float(distance)
             )
 
-            # 🛠️ อัปเดตสถานะใน UserProfile เพื่อให้หน้าจัดการกำลังพลเปลี่ยนตามทันที
+            # อัปเดตสถานะใน UserProfile
             try:
-                # ดึงข้อมูล Profile ของคนที่กำลังแสกนหน้า
                 profile, _ = UserProfile.objects.get_or_create(user=request.user)
-                
                 if action == 'checkin':
-                    profile.person_status = 'normal'  # เมื่อเช็คอินสำเร็จ -> เปลี่ยนสถานะเป็น "ปกติ"
+                    profile.person_status = 'normal'
                 elif action == 'checkout':
-                    profile.person_status = 'home'    # เมื่อเช็คเอาต์สำเร็จ -> เปลี่ยนสถานะเป็น "กลับบ้าน"
-                
+                    profile.person_status = 'home'
                 profile.save()
             except Exception as profile_err:
                 print("PROFILE UPDATE ERROR:", profile_err)
 
-            # 2. ส่งการแจ้งเตือนเข้าไปยังระบบ LINE
+            # ส่งแจ้งเตือน LINE
             try:
-                notify_line_return_status(
-                    trigger_record=record
-                )
+                notify_line_return_status(trigger_record=record)
             except Exception as e:
                 print("LINE ERROR:", e)
 
-            messages.success(
-                request,
-                'บันทึกสำเร็จ'
-            )
-
+            messages.success(request, 'บันทึกสำเร็จ')
             return redirect('dashboard')
 
         except Exception as e:
-
-            messages.error(
-                request,
-                str(e)
-            )
-
-            return redirect('checkin')
-        # 1. บันทึกข้อมูลประวัติการสแกนใบหน้าเข้า CheckInRecord
-            record = CheckInRecord.objects.create(
-                user=request.user,
-                latitude=float(user_lat),
-                longitude=float(user_lon),
-                action=action,
-                status=status,
-                verification_method=verification_method,
-                confidence_score=float(confidence_score),
-                distance_meters=float(distance)
-            )
-
-            # 🛠️ จุดที่เพิ่มใหม่: อัปเดตสถานะใน UserProfile เพื่อให้หน้าจัดการกำลังพลเปลี่ยนตามทันที
-            try:
-                # ดึงข้อมูล Profile ของคนที่กำลังแสกนหน้า
-                profile, _ = UserProfile.objects.get_or_create(user=request.user)
-                
-                if action == 'checkin':
-                    profile.person_status = 'normal'  # เมื่อเช็คอินสำเร็จ -> เปลี่ยนสถานะเป็น "ปกติ"
-                elif action == 'checkout':
-                    profile.person_status = 'home'    # เมื่อเช็คเอาต์สำเร็จ -> เปลี่ยนสถานะเป็น "กลับบ้าน"
-                
-                profile.save()
-            except Exception as profile_err:
-                print("PROFILE UPDATE ERROR:", profile_err)
-
-            # 2. ส่งการแจ้งเตือนเข้าไปยังระบบ LINE
-            try:
-                notify_line_return_status(
-                    trigger_record=record
-                )
-            except Exception as e:
-                print("LINE ERROR:", e)
-
-            messages.success(
-                request,
-                'บันทึกสำเร็จ'
-            )
-
-            return redirect('dashboard')
-
-        except Exception as e:
-
-            messages.error(
-                request,
-                str(e)
-            )
-
+            messages.error(request, str(e))
             return redirect('checkin')
 
     try:
-
-        face_profile, _ = (
-            UserFaceProfile.objects.get_or_create(
-                user=request.user
-            )
-        )
-
-        saved_descriptor = (
-            face_profile.face_descriptor
-            if face_profile.face_descriptor
-            else '[]'
-        )
-
+        face_profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
+        saved_descriptor = face_profile.face_descriptor if face_profile.face_descriptor else '[]'
     except Exception:
         saved_descriptor = '[]'
 
-    google_maps_api_key = getattr(
-        settings,
-        'AIzaSyAdEA5DMsDjS26MJotjMxeXkDRxbZZo_dY',
-        ''
-    )
+    google_maps_api_key = getattr(settings, 'GOOGLE_MAPS_API_KEY', '')
 
     context = {
         'office_lat': OFFICE_LAT,
@@ -873,93 +652,78 @@ def checkin_view(request):
         'saved_descriptor': saved_descriptor,
         'google_maps_api_key': google_maps_api_key,
     }
-
-    return render(
-        request,
-        'checkin.html',
-        context
-    )
+    return render(request, 'checkin.html', context)
 
 
 # ====================================================
-# Admin
+# Admin & User Management
 # ====================================================
 
 @login_required
 @user_passes_test(is_admin_or_staff)
 def admin_dashboard(request):
-    today = timezone.localdate()
-
-    # 1. ดึงข้อมูลโมเดล SystemSetting ส่งไปทั้งก้อน (แก้ปัญหาเวลากลับเข้ากรม และเคลียร์ NaN ใน JavaScript)
+    status_filter = request.GET.get('filter', 'PENDING')
+    company_filter = request.GET.get('company', '')
     system_setting = SystemSetting.objects.first()
 
-    # 2. คำนวณจำนวนกำลังพลทั้งหมด (ไม่รวมแอดมิน)
-    total_users = User.objects.filter(
-        is_superuser=False,
-        is_staff=False,
-        is_active=True
-    ).count()
-
-    # 3. นับจำนวนคนที่เช็คอินวันนี้แล้ว (นับแบบไม่ซ้ำคนใน 1 วัน)
-    today_records = CheckInRecord.objects.filter(created_at__date=today)
-    
-    # 4. ดึงรายชื่อออบเจกต์ User ของคนที่ "ยังไม่ได้เช็คอิน" ในวันนี้ เพื่อเอาไปวนลูปแสดงในตาราง
-    checked_user_ids = today_records.filter(action='checkin').values_list('user_id', flat=True)
-    not_checkedin_users = User.objects.filter(
-        is_superuser=False,
-        is_staff=False,
-        is_active=True
-    ).exclude(id__in=checked_user_ids).select_related('profile')
-
-    # 5. จัดตัวแปรลงชื่อคีย์เวิร์ดที่ไฟล์ HTML ชุดเก่าตั้งเอาไว้เป๊ะๆ
-    context = {
-        'system_setting': system_setting,          # 👈 แมทช์กับ {{ system_setting }} ทั่วทั้งหน้าจอ
-        'not_checkedin_users': not_checkedin_users,  # 👈 แมทช์กับ {{ not_checkedin_users }} ในตารางและการ์ดสีแดง
-    }
-
-    return render(
-        request,
-        'admin_dashboard.html',
-        context
+    profiles_query = UserProfile.objects.select_related('user').filter(
+        user__is_superuser=False,
+        user__is_staff=False,
+        user__is_active=True
     )
+
+    if company_filter:
+        profiles_query = profiles_query.filter(company=company_filter)
+
+    total_on_time = profiles_query.filter(return_status='ON_TIME').count()
+    total_late = profiles_query.filter(return_status='LATE').count()
+    total_pending = profiles_query.filter(return_status='PENDING').count()
+
+    if status_filter == 'ON_TIME':
+        display_users = profiles_query.filter(return_status='ON_TIME')
+        table_title = "รายชื่อกำลังพล: กลับรายงานตัวทันเวลา ✅"
+    elif status_filter == 'LATE':
+        display_users = profiles_query.filter(return_status='LATE')
+        table_title = "รายชื่อกำลังพล: กลับรายงานตัวไม่ทันเวลา (สาย) ❌"
+    elif status_filter == 'PENDING':
+        display_users = profiles_query.filter(return_status='PENDING')
+        table_title = "รายชื่อกำลังพล: ยังไม่กลับเข้ารายงานตัว ⏳"
+    else:
+        display_users = profiles_query
+        table_title = "รายชื่อกำลังพลทั้งหมดในระบบ"
+
+    context = {
+        'system_setting': system_setting,
+        'total_on_time': total_on_time,
+        'total_late': total_late,
+        'total_pending': total_pending,
+        'display_users': display_users,
+        'table_title': table_title,
+        'status_filter': status_filter,
+        'company_filter': company_filter,
+    }
+    return render(request, 'admin_dashboard.html', context)
+
 
 @login_required
 @user_passes_test(is_admin_or_staff)
 def manage_users(request):
-
     users_queryset = User.objects.filter(
         is_superuser=False,
         is_staff=False
-    ).select_related(
-        'profile',
-        'face_profile'
-    )
+    ).select_related('profile', 'face_profile')
 
-    search_query = request.GET.get(
-        'search',
-        ''
-    ).strip()
-
+    search_query = request.GET.get('search', '').strip()
     if search_query:
-
         users_queryset = users_queryset.filter(
-            Q(username__icontains=search_query)
-            |
-            Q(first_name__icontains=search_query)
-            |
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
             Q(last_name__icontains=search_query)
         )
 
-    filter_company = request.GET.get(
-        'company_filter',
-        ''
-    ).strip()
-
+    filter_company = request.GET.get('company_filter', '').strip()
     if filter_company:
-
-        users_queryset = users_queryset.filter(
-            profile__company=filter_company
-        )
+        users_queryset = users_queryset.filter(profile__company=filter_company)
 
     context = {
         'users': users_queryset,
@@ -968,57 +732,22 @@ def manage_users(request):
         'company_choices': UserProfile.COMPANY_CHOICES,
         'status_choices': UserProfile.PERSON_STATUS_CHOICES,
     }
+    return render(request, 'manage_users.html', context)
 
-    return render(
-        request,
-        'manage_users.html',
-        context
-    )
 
 @login_required
 @user_passes_test(is_admin_or_staff)
 @require_POST
 def add_user_admin(request):
+    username = request.POST.get('username', '').strip()
+    first_name = request.POST.get('first_name', '').strip()
+    last_name = request.POST.get('last_name', '').strip()
+    phone_number = request.POST.get('phone_number', '').strip()
+    company = request.POST.get('company', '').strip()
+    password = request.POST.get('password', '123456').strip()
 
-    username = request.POST.get(
-        'username',
-        ''
-    ).strip()
-
-    first_name = request.POST.get(
-        'first_name',
-        ''
-    ).strip()
-
-    last_name = request.POST.get(
-        'last_name',
-        ''
-    ).strip()
-
-    phone_number = request.POST.get(
-        'phone_number',
-        ''
-    ).strip()
-
-    company = request.POST.get(
-        'company',
-        ''
-    ).strip()
-
-    password = request.POST.get(
-        'password',
-        '123456'
-    ).strip()
-
-    if User.objects.filter(
-        username=username
-    ).exists():
-
-        messages.error(
-            request,
-            'Username ซ้ำ'
-        )
-
+    if User.objects.filter(username=username).exists():
+        messages.error(request, 'Username ซ้ำ')
         return redirect('manage_users')
 
     user = User.objects.create_user(
@@ -1035,100 +764,161 @@ def add_user_admin(request):
         person_status='normal'
     )
 
-    UserFaceProfile.objects.get_or_create(
-        user=user
-    )
+    UserFaceProfile.objects.get_or_create(user=user)
+    messages.success(request, 'เพิ่มผู้ใช้สำเร็จ')
+    return redirect('manage_users')
 
-    messages.success(
-        request,
-        'เพิ่มผู้ใช้สำเร็จ'
-    )
 
+@login_required
+@user_passes_test(is_admin_or_staff)
+@require_POST
+def edit_user_admin(request, user_id):
+    """
+    🛠️ เพิ่มใหม่: ฟังก์ชันรองรับการแก้ไขข้อมูลจากป๊อปอัปภาพที่ 5
+    อัปเดตชื่อ นามสกุล เบอร์โทร สังกัดกองร้อย และเดดไลน์วันขากลับรายวันด่วน
+    """
+    profile = get_object_or_404(UserProfile, user_id=user_id)
+    user = profile.user
+    
+    user.first_name = request.POST.get('first_name', '').strip()
+    user.last_name = request.POST.get('last_name', '').strip()
+    user.save()
+    
+    profile.phone_number = request.POST.get('phone_number', '').strip()
+    profile.company = request.POST.get('company', profile.company)
+    
+    single_return_date = request.POST.get('individual_return_deadline')
+    if single_return_date:
+        try:
+            bangkok_tz = pytz.timezone('Asia/Bangkok')
+            naive_datetime = datetime.strptime(f"{single_return_date} 18:00", "%Y-%m-%d %H:%M")
+            profile.individual_return_deadline = timezone.make_aware(naive_datetime, bangkok_tz)
+            profile.return_status = 'PENDING'
+        except Exception as e:
+            print("Error parsing return date:", e)
+            
+    profile.save()
+    messages.success(request, f'✏️ แก้ไขข้อมูลกำลังพล {user.first_name} เรียบร้อยแล้ว!')
+    return redirect('manage_users')
+
+
+@login_required
+@user_passes_test(is_admin_or_staff)
+@require_POST
+def save_leave_settings(request, user_id):
+    """
+    🛠️ เพิ่มใหม่: ฟังก์ชันรองรับการกด 'บันทึกข้อมูล' จากป๊อปอัปตั้งค่าวันลา (ภาพที่ 6)
+    คำนวณวันขากลับอัตโนมัติ (วันปล่อย + จำนวนวันลา) และรวมร่างกับเวลาเดดไลน์
+    """
+    profile = get_object_or_404(UserProfile, user_id=user_id)
+    start_date_str = request.POST.get('start_date')
+    num_days_str = request.POST.get('num_days', '0')
+    return_time_str = request.POST.get('return_time', '18:00')
+
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            num_days = int(num_days_str)
+            return_date = start_date + timedelta(days=num_days)
+            
+            datetime_combined_str = f"{return_date} {return_time_str}"
+            naive_datetime = datetime.strptime(datetime_combined_str, "%Y-%m-%d %H:%M")
+            
+            bangkok_tz = pytz.timezone('Asia/Bangkok')
+            aware_datetime = timezone.make_aware(naive_datetime, bangkok_tz)
+            
+            profile.start_date = start_date
+            profile.individual_return_deadline = aware_datetime
+            profile.person_status = 'leave'
+            profile.return_status = 'PENDING'
+            profile.save()
+            
+            messages.success(request, f'⏳ ตั้งค่าวันลาและคำนวณเดดไลน์ขากลับของ {profile.user.first_name} สำเร็จ!')
+        except Exception as e:
+            messages.error(request, f'เกิดข้อผิดพลาดในการคำนวณเวลาขากลับ: {str(e)}')
+            
     return redirect('manage_users')
 
 
 @login_required
 @user_passes_test(is_admin_or_staff)
 def delete_user_admin(request, user_id):
-
-    target_user = get_object_or_404(
-        User,
-        id=user_id
-    )
-
+    target_user = get_object_or_404(User, id=user_id)
     target_user.delete()
-
-    messages.success(
-        request,
-        'ลบผู้ใช้สำเร็จ'
-    )
-
+    messages.success(request, 'ลบผู้ใช้สำเร็จ')
     return redirect('manage_users')
 
 
 # ====================================================
-# Export PDF
+# Export & Report Views
 # ====================================================
 
 @login_required
 @user_passes_test(is_admin_or_staff)
-def export_pdf(request):
-
-    users_queryset = User.objects.filter(
-        is_superuser=False,
-        is_staff=False
-    ).select_related(
-        'profile',
-        'face_profile'
-    )
-
-    search_query = request.GET.get(
-        'search',
-        ''
-    ).strip()
-
-    if search_query:
-
-        users_queryset = users_queryset.filter(
-            Q(username__icontains=search_query)
-            |
-            Q(first_name__icontains=search_query)
-            |
-            Q(last_name__icontains=search_query)
-        )
-
-    filter_company = request.GET.get(
-        'company_filter',
-        ''
-    ).strip()
-
-    if filter_company:
-
-        users_queryset = users_queryset.filter(
-            profile__company=filter_company
-        )
-
-    context = {
-        'users': users_queryset,
-        'search_query': search_query,
-        'filter_company': filter_company,
-        'current_date': timezone.now()
-    }
-
-    return render(
-        request,
-        'export_pdf_template.html',
-        context
-    )
-
-
 # ====================================================
-# Lists
+# Export & Report Views
 # ====================================================
 
 @login_required
-def list_in_camp_view(request):
+@user_passes_test(is_admin_or_staff)
+# ====================================================
+# Export & Report Views
+# ====================================================
 
+@login_required
+@user_passes_test(is_admin_or_staff)
+def export_select_view(request):
+    """ 🛠️ เพิ่มใหม่: ฟังก์ชันสำหรับเรียกเปิดหน้าเลือกกองร้อยก่อนกดพิมพ์รายงาน """
+    return render(request, 'export_select.html')
+
+
+@login_required
+@user_passes_test(lambda u: u.is_staff or u.is_superuser) 
+def export_pdf(request, company_name='ALL'): # 👈 แก้ไขจุดนี้: ใส่ ='ALL' เป็นค่าเริ่มต้น
+    """
+    ฟังก์ชันส่งออกรายงานขากลับในรูปแบบสีขาว-ดำทางการ 
+    กรองแยกข้อมูลตัดจบเป็นรายไฟล์ตามชื่อกองร้อยที่ส่งมาจาก URL บน Sidebar ทันที
+    """
+    # 1. ดึงข้อมูลกำลังพลตั้งต้น (ไม่รวมแอดมินและระบบหลัก)
+    users_queryset = User.objects.filter(
+        is_superuser=False,
+        is_staff=False,
+        is_active=True
+    ).select_related('profile')
+
+    # 2. จัดการคัดกรองแบบแยกกองร้อยตามชื่อที่ส่งมาจาก URL
+    # ทำการ .strip() เพื่อความปลอดภัยของข้อมูลช่องว่าง
+    company_name = company_name.strip() if company_name else 'ALL'
+    
+    if company_name and company_name != 'ALL':
+        # ค้นหาแบบตรงตัวในฟิลด์บันทึกประวัติกองร้อย (เช่น 'ร้อย.1', 'ร้อย.2')
+        users_queryset = users_queryset.filter(profile__company=company_name)
+        
+        # ปรับการแสดงผลชื่อหัวข้อรายงานให้สวยงาม
+        if company_name.isdigit():
+            display_company = f"กองร้อยที่ {company_name}"
+        else:
+            display_company = company_name
+    else:
+        display_company = "ทุกกองร้อยรวม"
+
+    # 3. แยกชุดข้อมูลกำลังพลเป็น 3 กลุ่มตามสถานะขากลับ (ยังไม่กลับ, สาย, ตรงเวลา)
+    pending_users = users_queryset.filter(profile__return_status='PENDING').order_by('username')
+    late_users = users_queryset.filter(profile__return_status='LATE').order_by('username')
+    on_time_users = users_queryset.filter(profile__return_status='ON_TIME').order_by('username')
+
+    # 4. มัดรวมตัวแปรส่งผลลัพธ์ไปแสดงผลที่หน้าเทมเพลตใบพิมพ์รายงานสีขาวดำ
+    context = {
+        'filter_company': display_company,
+        'pending_users': pending_users,
+        'late_users': late_users,
+        'on_time_users': on_time_users,
+        'current_date': timezone.now().strftime('%d/%m/%Y'),
+    }
+    
+    return render(request, 'export_pdf_template.html', context)
+@login_required
+def list_in_camp_view(request):
     list_in_camp = User.objects.filter(
         profile__person_status='normal',
         is_staff=False
@@ -1138,32 +928,18 @@ def list_in_camp_view(request):
         'list_in_camp': list_in_camp,
         'stat_in_camp': list_in_camp.count(),
         'stat_out_camp': User.objects.filter(
-            profile__person_status__in=[
-                'leave',
-                'official'
-            ],
+            profile__person_status__in=['leave', 'official'],
             is_staff=False
         ).count(),
-        'stat_total': User.objects.filter(
-            is_staff=False
-        ).count(),
+        'stat_total': User.objects.filter(is_staff=False).count(),
     }
-
-    return render(
-        request,
-        'list_in_camp.html',
-        context
-    )
+    return render(request, 'list_in_camp.html', context)
 
 
 @login_required
 def list_out_camp_view(request):
-
     list_out_camp = User.objects.filter(
-        profile__person_status__in=[
-            'leave',
-            'official'
-        ],
+        profile__person_status__in=['leave', 'official'],
         is_staff=False
     ).select_related('profile')
 
@@ -1174,24 +950,14 @@ def list_out_camp_view(request):
             is_staff=False
         ).count(),
         'stat_out_camp': list_out_camp.count(),
-        'stat_total': User.objects.filter(
-            is_staff=False
-        ).count(),
+        'stat_total': User.objects.filter(is_staff=False).count(),
     }
-
-    return render(
-        request,
-        'list_out_camp.html',
-        context
-    )
+    return render(request, 'list_out_camp.html', context)
 
 
 @login_required
 def list_total_view(request):
-
-    list_total = User.objects.filter(
-        is_staff=False
-    ).select_related('profile')
+    list_total = User.objects.filter(is_staff=False).select_related('profile')
 
     context = {
         'list_total': list_total,
@@ -1200,56 +966,28 @@ def list_total_view(request):
             is_staff=False
         ).count(),
         'stat_out_camp': User.objects.filter(
-            profile__person_status__in=[
-                'leave',
-                'official'
-            ],
+            profile__person_status__in=['leave', 'official'],
             is_staff=False
         ).count(),
         'stat_total': list_total.count(),
     }
+    return render(request, 'list_total.html', context)
 
-    return render(
-        request,
-        'list_total.html',
-        context
-    )
-
-
-# ====================================================
-# Set Location
-# ====================================================
 
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
 def set_location_view(request):
-
     config = get_system_setting()
 
     if request.method == 'POST':
-
         lat = request.POST.get('latitude')
         lon = request.POST.get('longitude')
 
         config.latitude = lat
         config.longitude = lon
-
         config.save()
 
-        messages.success(
-            request,
-            'อัปเดตพิกัดสำเร็จ'
-        )
-
+        messages.success(request, 'อัปเดตพิกัดสำเร็จ')
         return redirect('set_location')
 
-    context = {
-        'current_lat': config.latitude,
-        'current_lon': config.longitude,
-    }
-
-    return render(
-        request,
-        'set_location.html',
-        context
-    )
+    return render(request, 'set_location.html', {'current_config': config})

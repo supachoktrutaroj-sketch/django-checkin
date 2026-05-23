@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-md mx-auto my-12 bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+    <div class="text-center mb-6">
+        <h2 class="text-xl font-bold text-slate-800">📄 พิมพ์รายงานกำลังพล (ทางการ)</h2>
+        <p class="text-xs text-slate-500 mt-1">กรุณาเลือกสังกัดกองร้อยที่ต้องการส่งออกรายงานแยกเป็นรายไฟล์</p>
+    </div>
+
+    <form method="GET" action="{% url 'export_pdf' %}" target="_blank" class="space-y-4">
+        <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-2">🎖️ เลือกสังกัดที่ต้องการพิมพ์เอกสาร</label>
+            <select name="company" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="ALL">-- รวมทุกกองร้อย (ไฟล์เดียว) --</option>
+                <option value="ร้อย.บก.">กองร้อยกองบังคับการ (ร้อย.บก.)</option>
+                <option value="ร้อย.1">กองร้อยที่ 1</option>
+                <option value="ร้อย.2">กองร้อยที่ 2</option>
+                <option value="ร้อย.3">กองร้อยที่ 3</option>
+                <option value="ร้อย.4">กองร้อยที่ 4</option>
+                <option value="ร้อย.สสห.">กองร้อยสนับสนุน (ร้อย.สสห.)</option>
+            </select>
+        </div>
+
+        <button type="submit" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-lg shadow transition-all flex items-center justify-center gap-2">
+            🖨️ เปิดรายงานแยกตามกองร้อย (สีขาว-ดำ)
+        </button>
+    </form>
+</div>
+{% endblock %}

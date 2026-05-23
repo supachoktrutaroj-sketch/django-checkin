@@ -8,7 +8,7 @@
             <span class="text-3xl">📤</span>
             <div>
                 <h1 class="text-xl font-bold text-slate-800">รายชื่อกำลังพล: ออกกรม</h1>
-                <p class="text-xs text-slate-400 mt-0.5">แสดงรายชื่อทหารที่ติดภารกิจลาพัก หรือเดินทางไปราชการภายนอก</p>
+                <p class="text-xs text-slate-400 mt-0.5">แสดงรายชื่อทหารที่ติดภารกิจลาพัก หรือเดินทางไปราชการภายนอกพร้อมระบบนับถอยหลังกลับกรม</p>
             </div>
         </div>
         <a href="{% url 'manage_users' %}" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-xl transition shadow-sm flex items-center gap-1">
@@ -23,15 +23,21 @@
                     <th class="p-4 pl-6">ชื่อ-นามสกุล</th>
                     <th class="p-4">ประเภทการออกกรม</th>
                     <th class="p-4">สังกัดกองร้อย</th>
-                    <th class="p-4 text-center text-amber-600">กำหนดวันกลับเข้ากรม</th>
+                    <th class="p-4 text-center text-amber-500">กำหนดวันกลับ & เวลาคงเหลือ</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-slate-600">
                 {% for u in list_out_camp %}
                 <tr class="hover:bg-slate-50/80 transition">
                     <td class="p-4 pl-6 font-semibold text-slate-800 flex items-center gap-2">
-                        <span class="text-amber-500">🪖</span> {{ u.first_name }} {{ u.last_name }}
+                        <span class="text-amber-500">🪖</span> 
+                        {% if u.profile.full_name %}
+                            {{ u.profile.full_name }}
+                        {% else %}
+                            {{ u.first_name }} {{ u.last_name }}
+                        {% endif %}
                     </td>
+                    
                     <td class="p-4">
                         {% if u.profile.person_status == 'leave' %}
                             <span class="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-100">📌 ลาภารกิจ</span>
@@ -39,14 +45,32 @@
                             <span class="px-2.5 py-1 bg-purple-50 text-purple-700 rounded-lg text-xs font-bold border border-purple-100">💼 ไปราชการ</span>
                         {% endif %}
                     </td>
-                    <td class="p-4 text-slate-400">{{ u.profile.get_company_display|default:"-" }}</td>
-                    <td class="p-4 text-center font-bold text-amber-600 bg-amber-50/30">
-                        🗓 {{ u.profile.return_date|date:"d/m/Y"|default:"ยังไม่ระบุ" }}
+                    
+                    <td class="p-4 text-slate-700 font-medium">
+                        <span class="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold">
+                            {{ u.profile.get_company_display_thai|default:"-" }}
+                        </span>
+                    </td>
+                    
+                    <td class="p-4 text-center bg-amber-50/10">
+                        <div class="flex flex-column items-center justify-center gap-1">
+                            <span class="font-bold text-slate-700 block text-xs">
+                                🗓 {% if u.profile.individual_return_deadline %}
+                                    {{ u.profile.individual_return_deadline|date:"d/m/Y - H:i" }} น.
+                                   {% else %}
+                                    ยังไม่ระบุ
+                                   {% endif %}
+                            </span>
+                            
+                            <span class="text-xs font-black text-rose-600 mt-1 block px-2 py-0.5 bg-rose-50 rounded-md border border-rose-100 animate-pulse">
+                                📅 {{ u.profile.get_days_remaining }}
+                            </span>
+                        </div>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="p-12 text-center text-slate-400 italic">📭 ไม่มีข้อมูลกำลังพลในสถานะนี้</td>
+                    <td colspan="4" class="p-12 text-center text-slate-400 italic">📭 ไม่มีข้อมูลกำลังพลในสถานะออกกรม ณ ขณะนี้</td>
                 </tr>
                 {% endfor %}
             </tbody>
