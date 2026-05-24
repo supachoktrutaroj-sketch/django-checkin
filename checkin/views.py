@@ -449,24 +449,33 @@ def time_settings_view(request):
     system_setting, _ = SystemSetting.objects.get_or_create(id=1)
 
     if request.method == 'POST':
-        checkin_start = request.POST.get('checkin_start_time')
+        # 🛠️ ปรับให้รับค่าได้ทั้งชื่อเก่าและชื่อใหม่ เผื่อหน้า HTML ใช้คนละชื่อกัน
+        checkin_start = request.POST.get('checkin_start_time') or request.POST.get('start_time')
         late_time = request.POST.get('late_time')
         
         try:
-            bangkok_tz = pytz.timezone('Asia/Bangkok')
-            today_str = datetime.today().strftime('%Y-%m-%d')
-
+            # 1. จัดการเวลาเริ่มเข้างาน
             if checkin_start:
-                naive_start = datetime.strptime(f"{today_str} {checkin_start}", "%Y-%m-%d %H:%M")
-                aware_start = timezone.make_aware(naive_start, bangkok_tz)
-                system_setting.checkin_start_time = aware_start.time()
-
-            if late_time:
-                naive_late = datetime.strptime(f"{today_str} {late_time}", "%Y-%m-%d %H:%M")
-                aware_late = timezone.make_aware(naive_late, bangkok_tz)
-                system_setting.late_time = aware_late.time()
+                # ป้องกันกรณีมีวินาทีติดมา หรือมาแค่ H:M
+                try:
+                    time_obj = datetime.strptime(checkin_start.strip(), "%H:%M").time()
+                except ValueError:
+                    time_obj = datetime.strptime(checkin_start.strip(), "%H:%M:%S").time()
                 
+                system_setting.checkin_start_time = time_obj
+
+            # 2. จัดการเวลากำหนดสาย
+            if late_time:
+                try:
+                    late_obj = datetime.strptime(late_time.strip(), "%H:%M").time()
+                except ValueError:
+                    late_obj = datetime.strptime(late_time.strip(), "%H:%M:%S").time()
+                
+                system_setting.late_time = late_obj
+                
+            # 💾 บันทึกลงฐานข้อมูล
             system_setting.save()
+            
             messages.success(request, '💾 อัปเดตการตั้งค่าเวลาเข้างานตรงตามที่พิมพ์เรียบร้อยแล้ว!')
             return redirect('admin_dashboard')
             
@@ -477,7 +486,6 @@ def time_settings_view(request):
         'system_setting': system_setting,
     }
     return render(request, 'time_settings.html', context)
-
 
 @login_required
 def history_view(request):

@@ -338,7 +338,7 @@
     <div class="setting-summary">
         <div class="time-pill">
             เวลากลับเข้ากรมส่วนกลาง<br>
-            {{ system_setting.return_deadline|time:"H:i" }} น.
+            <strong>{{ system_setting.checkin_start_time|time:"H:i" }} น.</strong>
         </div>
 
         <div class="time-pill">
@@ -347,7 +347,7 @@
         </div>
 
         <div id="deadline-status">
-            กำลังโหลด...
+            กำลังโหลดระบบนับถอยหลัง...
         </div>
     </div>
 </div>
@@ -561,17 +561,24 @@
 
     function updateClock() {
         const now = new Date();
-        const deadlineText = "{{ system_setting.return_deadline|time:'H:i' }}";
-        if (!deadlineText || deadlineText === "None") return;
+        
+        // แก้ไขตรงนี้ดึงค่าฟิลด์กลางของฐานข้อมูล checkin_start_time อย่างปลอดภัย
+        const deadlineText = "{{ system_setting.checkin_start_time|time:'H:i' }}";
+        if (!deadlineText || deadlineText === "None") {
+            const el = document.getElementById("deadline-status");
+            if (el) el.innerHTML = "⏳ ไม่พบข้อมูลเวลากลาง";
+            return;
+        }
         
         const [h, m] = deadlineText.split(":").map(Number);
 
+        // ป้องกันปัญหาข้ามวัน โดยเซ็ตค่าชั่วโมงและนาทีมาตรฐานให้สอดคล้องกับวันปัจจุบัน
         const deadline = new Date();
         deadline.setHours(h, m, 0, 0);
 
         const day = String(now.getDate()).padStart(2, '0');
         const month = String(now.getMonth() + 1).padStart(2, '0');
-        const year = now.getFullYear() + 543;
+        const year = now.getFullYear() + 543; // แปลงพุทธศักราชสำหรับแสดงผล
 
         const hh = String(now.getHours()).padStart(2, '0');
         const mm = String(now.getMinutes()).padStart(2, '0');
@@ -585,13 +592,21 @@
         const el = document.getElementById("deadline-status");
         if (el) {
             if (now > deadline) {
-                const diff = Math.floor((now - deadline) / 60000);
-                el.innerHTML = `❌ เลยเวลากลางแล้ว<br><b>${diff}</b> นาที`;
+                // หากเวลาปัจจุบันเกินกำหนดเวลากลางไปแล้ว
+                const diffMs = now - deadline;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffSecs = Math.floor((diffMs % 60000) / 1000);
+                
+                el.innerHTML = `❌ เลยเวลากลางแล้ว<br><b>${diffMins} นาที ${diffSecs} วินาที</b>`;
                 el.style.background = "#fee2e2";
                 el.style.color = "#991b1b";
             } else {
-                const diff = Math.floor((deadline - now) / 60000);
-                el.innerHTML = `⏳ เหลือนับถอยหลัง<br><b>${diff}</b> นาที`;
+                // หากยังอยู่ในช่วงเวลาก่อนหน้ากำหนดเวลากลาง
+                const diffMs = deadline - now;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffSecs = Math.floor((diffMs % 60000) / 1000);
+                
+                el.innerHTML = `⏳ เหลือนับถอยหลัง<br><b>${diffMins} นาที ${diffSecs} วินาที</b>`;
                 el.style.background = "#dcfce7";
                 el.style.color = "#166534";
             }
@@ -601,7 +616,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         setupModalLivePreview();
         updateClock();
-        setInterval(updateClock, 1000);
+        setInterval(updateClock, 1000); // อัปเดตแบบเรียลไทม์ทุก ๆ 1 วินาที
     });
 </script>
 {% endblock %}
