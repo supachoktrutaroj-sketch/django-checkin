@@ -1,6 +1,5 @@
 from pathlib import Path
 import os
-import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -54,14 +53,18 @@ TEMPLATES = [
 WSGI_APPLICATION = 'myproject.wsgi.application'
 
 # ==============================================================================
-# 🪖 DATABASE CONFIGURATION (เชื่อมสายตรงเข้าฐานข้อมูลหลักบน Railway)
+# 🪖 DATABASE CONFIGURATION (เชื่อมสายตรงเข้าฐานข้อมูลหลักบน Railway แบบ Native)
 # ==============================================================================
-# ดึงค่าจาก Environment Variable เป็นหลัก ถ้าไม่มีให้ล็อกเข้าที่อยู่ภายในตัวจริงทันที
-INTERNAL_DB_URL = "postgresql://postgres:itdycDDkceMnyapCLsIqdUaYJXusPmXX@django-checkin-db.railway.internal:5432/railway"
-DATABASE_URL = os.environ.get("DATABASE_URL", INTERNAL_DB_URL)
-
+# ใช้โครงสร้างมาตรฐานของ Django ไม่ต้องง้อแพ็กเกจเสริม ป้องกันการบิลด์พังร้อยเปอร์เซ็นต์
 DATABASES = {
-    "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=False)
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'railway',
+        'USER': 'postgres',
+        'PASSWORD': 'itdycDDkceMnyapCLsIqdUaYJXusPmXX',
+        'HOST': 'django-checkin-db.railway.internal',
+        'PORT': '5432',
+    }
 }
 # ==============================================================================
 
@@ -85,6 +88,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 STATICFILES_DIRS = [
     BASE_DIR / "checkin/static",
+    # ซ่อมบั๊กเล็กน้อย: ถ้ามีโฟลเดอร์ภายนอกอื่น สามารถเพิ่มได้ตรงนี้
 ]
 
 STORAGES = {
