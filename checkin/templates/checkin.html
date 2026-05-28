@@ -242,7 +242,7 @@
         <input type="hidden" name="latitude" id="lat">
         <input type="hidden" name="longitude" id="lon">
         <input type="hidden" name="action" id="actionInput">
-        <input type="hidden" name="verification_method" value="face_recognition">
+        <input type="hidden" name="verification_method" id="verificationMethodInput" value="face_recognition">
         <input type="hidden" name="confidence_score" id="confidenceScoreInput" value="0.0">
 
         <div class="btn-group">
@@ -250,7 +250,7 @@
                 ✅ เช็คอิน
             </button>
 
-            <button class="action-btn btn-checkout" type="button" id="checkoutBtn" onclick="startFaceFlow('checkout')" disabled>
+            <button class="action-btn btn-checkout" type="button" id="checkoutBtn" onclick="directCheckoutFlow()" disabled>
                 🔴 เช็คเอาต์
             </button>
         </div>
@@ -383,7 +383,6 @@
                     const distance = calculateDistance(userLat, userLon, defaultLat, defaultLon);
                     document.getElementById("distanceText").innerText = Math.round(distance) + " เมตร";
 
-                    // อัปเดตตำแหน่งหมุดในแผนที่แบบครอบ try-catch เพื่อความปลอดภัยสูงสุด ⚡
                     try {
                         if (typeof google !== 'undefined' && google.maps && map) {
                             const userLocation = { lat: userLat, lng: userLon };
@@ -403,7 +402,7 @@
 
                     if (distance <= allowedRadius) {
                         gpsAllowed = true;
-                        setStatus(true, "✅ พิกัดถูกต้องตามเงื่อนไข ปุ่มเช็คอินเปิดให้ใช้งานแล้ว");
+                        setStatus(true, "✅ พิกัดถูกต้องตามเงื่อนไข ปุ่มเช็คอิน/เช็คเอาต์เปิดให้ใช้งานแล้ว");
                         setButtonsEnabled(true);
                     } else {
                         gpsAllowed = false;
@@ -476,6 +475,24 @@
             setFaceStatus("⚠️ ระบบจดจำใบหน้ายังโหลดไม่เสร็จ กรุณารอสักครู่", "warning");
         } else {
             setFaceStatus("กรุณาเปิดกล้อง แล้วกดเริ่มสแกน", "warning");
+        }
+    }
+
+    /* 🚀 ฟังก์ชันเช็คเอาต์ด่วนพิเศษ: ข้ามระบบกล้อง สั่ง Submit ข้อมูลพิกัดทันที */
+    function directCheckoutFlow() {
+        if (!gpsAllowed) {
+            alert("ไม่สามารถดำเนินการได้ เนื่องจากอยู่นอกพื้นที่พิกัดสัญญาณ");
+            return;
+        }
+
+        if (confirm("ยืนยันการบันทึกเวลา 'เช็คเอาต์' ออกจากหน่วยปฏิบัติงาน?")) {
+            // ตั้งค่าข้อมูลฟอร์มส่งไปหลังบ้าน
+            document.getElementById("actionInput").value = "checkout";
+            document.getElementById("confidenceScoreInput").value = "1.0"; // ให้คะแนนเต็มผ่านฉลุย
+            document.getElementById("verificationMethodInput").value = "button_click"; // ระบุประเภทการตรวจว่ากดผ่านปุ่ม
+
+            // ยิงส่งฟอร์มทันที
+            document.getElementById("checkinForm").submit();
         }
     }
 
@@ -612,7 +629,7 @@
 
     async function verifyDetectedFace(detection) {
         if (!savedDescriptor || savedDescriptor.length === 0) {
-            setFaceStatus("❌ ไม่พบข้อมูลใบหน้าที่ลงทะเบียนไว้", "error");
+            setFaceStatus("❌ 不ไม่พบข้อมูลใบหน้าที่ลงทะเบียนไว้", "error");
             return;
         }
         const labeledDescriptor = new faceapi.LabeledFaceDescriptors(

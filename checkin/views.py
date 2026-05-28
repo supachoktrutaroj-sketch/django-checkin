@@ -591,7 +591,49 @@ def checkin_view(request):
             return redirect('checkin')
 
         try:
-            if action == 'checkin':
+            user_lat_float = float(user_lat)
+            user_lon_float = float(user_lon)
+            distance = calculate_distance(user_lat_float, user_lon_float, OFFICE_LAT, OFFICE_LON)
+
+            # =========================================================
+            # 🔓 กรณีที่ 1: ถ้าผู้ใช้งานกดปุ่ม "เช็คเอาต์" (ออกนอกค่าย/กลับบ้าน)
+            # =========================================================
+            if action == 'checkout':
+                # เช็คเอาต์ ปล่อยผ่านเป็นสถานะปกติ ไม่ต้องคำนวณเวลาสาย
+                status = 'present' 
+                
+                record = CheckInRecord.objects.create(
+                    user=request.user,
+                    latitude=user_lat_float,
+                    longitude=user_lon_float,
+                    action=action,
+                    status=status,
+                    verification_method=verification_method,
+                    confidence_score=float(confidence_score),
+                    distance_meters=float(distance)
+                )
+
+                # อัปเดตสถานะใน UserProfile เป็นกลับบ้าน (home)
+                try:
+                    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+                    profile.person_status = 'home'
+                    profile.save()
+                except Exception as profile_err:
+                    print("PROFILE UPDATE ERROR:", profile_err)
+
+                # ส่งแจ้งเตือน LINE แจ้งว่ากำลังพลเช็คเอาต์ออกนอกหน่วย
+                try:
+                    notify_line_return_status(trigger_record=record)
+                except Exception as e:
+                    print("LINE ERROR:", e)
+
+                messages.success(request, 'บันทึกการเช็คเอาต์สำเร็จ')
+                return redirect('dashboard')
+
+            # =========================================================
+            # 📸 กรณีที่ 2: ถ้าผู้ใช้งานกดปุ่ม "เช็คอิน" (กลับเข้ากรม) -> ทำงานเข้มงวดเหมือนเดิม
+            # =========================================================
+            elif action == 'checkin':
                 today = timezone.localdate()
                 already_checked_in = CheckInRecord.objects.filter(
                     user=request.user,
@@ -603,47 +645,42 @@ def checkin_view(request):
                     messages.error(request, 'วันนี้คุณได้ทำการเช็คอินไปเรียบร้อยแล้ว ไม่สามารถเช็คอินซ้ำได้')
                     return redirect('checkin')
 
-            # 🛠️ ซ่อมบั๊กตัวแปรหาย: ประกาศคำนวณระยะทางและสถานะส่งไปเก็บใน Record
-            user_lat_float = float(user_lat)
-            user_lon_float = float(user_lon)
-            distance = calculate_distance(user_lat_float, user_lon_float, OFFICE_LAT, OFFICE_LON)
-            status = calculate_status(timezone.now())
+                # คำนวณสถานะเวลาขากลับ (ทันเวลา / สาย)
+                status = calculate_status(timezone.now())
 
-            record = CheckInRecord.objects.create(
-                user=request.user,
-                latitude=user_lat_float,
-                longitude=user_lon_float,
-                action=action,
-                status=status,
-                verification_method=verification_method,
-                confidence_score=float(confidence_score),
-                distance_meters=float(distance)
-            )
+                record = CheckInRecord.objects.create(
+                    user=request.user,
+                    latitude=user_lat_float,
+                    longitude=user_lon_float,
+                    action=action,
+                    status=status,
+                    verification_method=verification_method,
+                    confidence_score=float(confidence_score),
+                    distance_meters=float(distance)
+                )
 
-            # อัปเดตสถานะใน UserProfile
-            try:
-                profile, _ = UserProfile.objects.get_or_create(user=request.user)
-                if action == 'checkin':
+                # อัปเดตสถานะใน UserProfile เป็นปกติ (เข้าเวร/อยู่หน่วย)
+                try:
+                    profile, _ = UserProfile.objects.get_or_create(user=request.user)
                     profile.person_status = 'normal'
-                elif action == 'checkout':
-                    profile.person_status = 'home'
-                profile.save()
-            except Exception as profile_err:
-                print("PROFILE UPDATE ERROR:", profile_err)
+                    profile.save()
+                except Exception as profile_err:
+                    print("PROFILE UPDATE ERROR:", profile_err)
 
-            # ส่งแจ้งเตือน LINE
-            try:
-                notify_line_return_status(trigger_record=record)
-            except Exception as e:
-                print("LINE ERROR:", e)
+                # ส่งแจ้งเตือน LINE สำหรับการกลับเข้ากรม
+                try:
+                    notify_line_return_status(trigger_record=record)
+                except Exception as e:
+                    print("LINE ERROR:", e)
 
-            messages.success(request, 'บันทึกสำเร็จ')
-            return redirect('dashboard')
+                messages.success(request, 'บันทึกการเช็คอินสำเร็จ')
+                return redirect('dashboard')
 
         except Exception as e:
             messages.error(request, str(e))
             return redirect('checkin')
 
+    # --- ส่วนแสดงหน้าเว็บปกติคงไว้ตามเดิม ---
     try:
         face_profile, _ = UserFaceProfile.objects.get_or_create(user=request.user)
         saved_descriptor = face_profile.face_descriptor if face_profile.face_descriptor else '[]'
@@ -661,8 +698,6 @@ def checkin_view(request):
         'google_maps_api_key': google_maps_api_key,
     }
     return render(request, 'checkin.html', context)
-
-
 # ====================================================
 # Admin & User Management
 # ====================================================
