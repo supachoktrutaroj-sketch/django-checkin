@@ -98,13 +98,14 @@ class SystemSetting(models.Model):
 
 class UserProfile(models.Model):
 
+    # 🛠️ ปรับตัวเลือกสุดท้ายจาก 'กองร้อยสนับสนุน' เป็น '5' เพื่อให้ตรงกับโครงสร้างข้อมูลจริงใน Database
     COMPANY_CHOICES = [
         ('กองร้อยกองบังคับการ', 'กองร้อยกองบังคับการ'),
         ('กองร้อยที่ 1', 'กองร้อยที่ 1'),
         ('กองร้อยที่ 2', 'กองร้อยที่ 2'),
         ('กองร้อยที่ 3', 'กองร้อยที่ 3'),
         ('กองร้อยที่ 4', 'กองร้อยที่ 4'),
-        ('กองร้อยสนับสนุน', 'กองร้อยสนับสนุน'),
+        ('5', 'กองร้อยที่ 5'), 
     ]
 
     PERSON_STATUS_CHOICES = [
@@ -174,10 +175,15 @@ class UserProfile(models.Model):
         db_index=True
     )
 
+    # 🛠️ ปรับฟังก์ชันแสดงผลภาษาไทยให้ดักจับเลข '5' หรือคำเก่า 'กองร้อยสนับสนุน' ส่งออกเป็นคำว่า "กองร้อยที่ 5"
     def get_company_display_thai(self):
-        if self.company and self.company in dict(self.COMPANY_CHOICES):
-            return dict(self.COMPANY_CHOICES).get(self.company)
-        return self.company if self.company else "-"
+        if self.company:
+            if self.company == '5' or self.company == 'กองร้อยสนับสนุน':
+                return "กองร้อยที่ 5"
+            if self.company in dict(self.COMPANY_CHOICES):
+                return dict(self.COMPANY_CHOICES).get(self.company)
+            return self.company
+        return "-"
 
     def get_status_display_thai(self):
         if self.person_status and self.person_status in dict(self.PERSON_STATUS_CHOICES):
