@@ -1045,7 +1045,7 @@ def export_pdf(request, company_name='ALL'):
     # ⚠️ ตรวจสอบชื่อไฟล์ HTML ของคุณในโฟลเดอร์ templates ให้ดีครับ!
     # หากไฟล์ชื่อ export_pdf.html ให้แก้เป็น 'export_pdf.html' 
     # หากไฟล์ชื่อ export_pdf_template.html ให้ใช้ค่าเดิมนี้ได้เลยครับ
-    return render(request, 'export_pdf.html', context)
+    return render(request, 'export_pdf_template.html', context)
 @login_required
 def list_in_camp_view(request):
     list_in_camp = User.objects.filter(
