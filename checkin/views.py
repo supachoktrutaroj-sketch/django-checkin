@@ -706,7 +706,6 @@ def checkin_view(request):
 @user_passes_test(is_admin_or_staff)
 def admin_dashboard(request):
     status_filter = request.GET.get('filter', 'PENDING')
-    # 1. ปรับมารองรับทั้งคำว่า 'company' หรือ 'company_filter' ที่ส่งมาจาก HTML
     company_filter = request.GET.get('company', request.GET.get('company_filter', ''))
     system_setting = SystemSetting.objects.first()
 
@@ -716,24 +715,20 @@ def admin_dashboard(request):
         user__is_active=True
     )
 
-    # 🛠️ [จุดแก้ไข] แปลงข้อความภาษาไทยจากหน้าเว็บให้เป็น "ตัวเลข/รหัสย่อ" ให้ครบทุกกองร้อย
     if company_filter:
         company_filter = company_filter.strip()
-        mapped_company = company_filter
-        
         if "1" in company_filter:
-            mapped_company = "1"
+            profiles_query = profiles_query.filter(Q(company="1") | Q(company="กองร้อยที่ 1"))
         elif "2" in company_filter:
-            mapped_company = "2"
+            profiles_query = profiles_query.filter(Q(company="2") | Q(company="กองร้อยที่ 2"))
         elif "3" in company_filter:
-            mapped_company = "3"
+            profiles_query = profiles_query.filter(Q(company="3") | Q(company="กองร้อยที่ 3"))
         elif "4" in company_filter:
-            mapped_company = "4"
-        # เพิ่มดักจับ สนน. และ สสห. เพื่อแปลงค่ากลับเข้าฐานข้อมูล
+            profiles_query = profiles_query.filter(Q(company="4") | Q(company="กองร้อยที่ 4"))
+        elif "บก" in company_filter or "บังคับการ" in company_filter:
+            profiles_query = profiles_query.filter(Q(company="กองร้อยกองบังคับการ") | Q(company="บก."))
         elif "สนน" in company_filter or "สนับสนุน" in company_filter or "สสห" in company_filter:
-            mapped_company = "สนน."
-            
-        profiles_query = profiles_query.filter(company=mapped_company)
+            profiles_query = profiles_query.filter(Q(company="กองร้อยสนับสนุน") | Q(company="สนน."))
 
     total_on_time = profiles_query.filter(return_status='ON_TIME').count()
     total_late = profiles_query.filter(return_status='LATE').count()
@@ -760,10 +755,9 @@ def admin_dashboard(request):
         'display_users': display_users,
         'table_title': table_title,
         'status_filter': status_filter,
-        'company_filter': company_filter,  # ส่งกลับไปแสดงผลที่หน้าเว็บ
+        'company_filter': company_filter,
     }
     return render(request, 'admin_dashboard.html', context)
-
 
 @login_required
 @user_passes_test(is_admin_or_staff)
@@ -773,10 +767,8 @@ def manage_users(request):
         first_name = request.POST.get('first_name')
         last_name = request.POST.get('last_name')
         phone_number = request.POST.get('phone_number')
-        company = request.POST.get('company')  # รับค่ากองร้อยที่ส่งมาจากฟอร์มแก้ไข
+        company = request.POST.get('company')
         person_status = request.POST.get('person_status')
-        
-        # รับค่าจากกล่อง Input type="date"
         return_date_raw = request.POST.get('return_date')
 
         try:
@@ -788,39 +780,21 @@ def manage_users(request):
             profile = user.profile
             profile.phone_number = phone_number
             
-            # 🛠️ [จุดเพิ่มเติมสำหรับขา POST] แปลงคำย่อที่อาจหลุดมาจากฟอร์มหน้าเว็บ ให้เป็นคำเต็มก่อนบันทึกเข้า DB
+            # ขาเซฟ: บันทึกค่าเดิมที่ส่งมา
             if company:
-                company = company.strip()
-                mapped_save_company = company
-                if "1" in company:
-                    mapped_save_company = "กองร้อยที่ 1"
-                elif "2" in company:
-                    mapped_save_company = "กองร้อยที่ 2"
-                elif "3" in company:
-                    mapped_save_company = "กองร้อยที่ 3"
-                elif "4" in company:
-                    mapped_save_company = "กองร้อยที่ 4"
-                elif "บก" in company or "บังคับการ" in company:
-                    mapped_save_company = "กองร้อยกองบังคับการ"
-                elif "สนน" in company or "สนับสนุน" in company or "สสห" in company:
-                    mapped_save_company = "กองร้อยสนับสนุน"
-                
-                profile.company = mapped_save_company
+                profile.company = company.strip()
                 
             profile.person_status = person_status
             
-            # 🟢 เซฟลงตัวแปรจริงตามโครงสร้างโมเดล
             if return_date_raw:
                 try:
-                    # ผสมวันที่จากฟอร์มเข้ากับเวลาเย็น 18:00:00 เพื่อให้เป็น DateTime
                     datetime_str = f"{return_date_raw} 18:00:00"
                     profile.individual_return_deadline = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S')
                 except ValueError:
                     profile.individual_return_deadline = None
             else:
-                profile.individual_return_deadline = None # ถ้าไม่ได้เลือกวันที่มา ให้เคลียร์เป็นค่าว่าง
+                profile.individual_return_deadline = None
 
-            # ซิงค์ค่าของสถานะส่งให้หน้า Admin Dashboard
             if person_status == 'normal':
                 profile.return_status = 'ON_TIME' 
                 profile.individual_return_deadline = None 
@@ -833,7 +807,7 @@ def manage_users(request):
             messages.error(request, "ไม่พบข้อมูลกำลังพลในระบบ")
             
     # -------------------------------------------------------------
-    # 🛠️ ส่วนดึงข้อมูลและกรองข้อมูล (แก้ไขเพื่อรองรับค่าภาษาไทยแบบคำเต็มตาม Model)
+    # ขาดึงข้อมูล: ค้นหาแบบยืดหยุ่น รองรับทั้ง เลขเดี่ยว และ คำเต็มภาษาไทย
     users_queryset = User.objects.filter(
         is_superuser=False,
         is_staff=False
@@ -849,27 +823,24 @@ def manage_users(request):
 
     filter_company = request.GET.get('company_filter', '').strip()
     if filter_company:
-        mapped_company = filter_company
-        # แปลงข้อความภาษาไทยหรือคำย่อจากปุ่มคัดกรองหน้าเว็บ ให้ตรงกับคำเต็มในฐานข้อมูล
+        # ใช้ Q เช็คควบคู่ทั้งรหัสย่อและคำเต็ม ป้องกันฐานข้อมูลเก็บค่าไม่เหมือนกัน
         if "1" in filter_company:
-            mapped_company = "กองร้อยที่ 1"
+            users_queryset = users_queryset.filter(Q(profile__company="1") | Q(profile__company="กองร้อยที่ 1"))
         elif "2" in filter_company:
-            mapped_company = "กองร้อยที่ 2"
+            users_queryset = users_queryset.filter(Q(profile__company="2") | Q(profile__company="กองร้อยที่ 2"))
         elif "3" in filter_company:
-            mapped_company = "กองร้อยที่ 3"
+            users_queryset = users_queryset.filter(Q(profile__company="3") | Q(profile__company="กองร้อยที่ 3"))
         elif "4" in filter_company:
-            mapped_company = "กองร้อยที่ 4"
+            users_queryset = users_queryset.filter(Q(profile__company="4") | Q(profile__company="กองร้อยที่ 4"))
         elif "บก" in filter_company or "บังคับการ" in filter_company:
-            mapped_company = "กองร้อยกองบังคับการ"
+            users_queryset = users_queryset.filter(Q(profile__company="กองร้อยกองบังคับการ") | Q(profile__company="บก."))
         elif "สนน" in filter_company or "สนับสนุน" in filter_company or "สสห" in filter_company:
-            mapped_company = "กองร้อยสนับสนุน"
+            users_queryset = users_queryset.filter(Q(profile__company="กองร้อยสนับสนุน") | Q(profile__company="สนน."))
             
-        users_queryset = users_queryset.filter(profile__company=mapped_company)
-
     context = {
         'users': users_queryset,
         'search_query': search_query,
-        'company_filter': filter_company,  # ส่งค่ากลับไปเพื่อให้ดรอปดาวน์ค้างสถานะที่เลือกไว้
+        'company_filter': filter_company,
         'filter_company': filter_company,
         'company_choices': UserProfile.COMPANY_CHOICES,
         'status_choices': UserProfile.PERSON_STATUS_CHOICES,
