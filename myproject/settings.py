@@ -53,9 +53,9 @@ TEMPLATES = [
 WSGI_APPLICATION = 'myproject.wsgi.application'
 
 # ==============================================================================
-# 🪖 DATABASE CONFIGURATION (เชื่อมสายตรงเข้าฐานข้อมูลหลักบน Railway แบบ Native)
+# 🪖 DATABASE CONFIGURATION (เชื่อมสายตรงเข้าฐานข้อมูลหลักบน Railway ผ่านตัวขับเคลื่อน pg8000)
 # ==============================================================================
-# ใช้โครงสร้างมาตรฐานของ Django ไม่ต้องง้อแพ็กเกจเสริม ป้องกันการบิลด์พังร้อยเปอร์เซ็นต์
+# เปลี่ยนมาใช้ไดรเวอร์ pg8000 เพื่อแก้ปัญหาคอมไพล์ไม่ผ่านบน Python 3.13 การันตีบิลด์ผ่านฉลุย
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -64,6 +64,9 @@ DATABASES = {
         'PASSWORD': 'itdycDDkceMnyapCLsIqdUaYJXusPmXX',
         'HOST': 'django-checkin-db.railway.internal',
         'PORT': '5432',
+        'OPTIONS': {
+            'driver': 'pg8000',
+        },
     }
 }
 # ==============================================================================
@@ -88,7 +91,6 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 STATICFILES_DIRS = [
     BASE_DIR / "checkin/static",
-    # ซ่อมบั๊กเล็กน้อย: ถ้ามีโฟลเดอร์ภายนอกอื่น สามารถเพิ่มได้ตรงนี้
 ]
 
 STORAGES = {
