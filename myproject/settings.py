@@ -53,9 +53,9 @@ TEMPLATES = [
 WSGI_APPLICATION = 'myproject.wsgi.application'
 
 # ==============================================================================
-# 🪖 DATABASE CONFIGURATION (เชื่อมสายตรงเข้าฐานข้อมูลหลักบน Railway ผ่านตัวขับเคลื่อน pg8000)
+# 🪖 DATABASE CONFIGURATION (เชื่อมสายตรงเข้าฐานข้อมูลหลักบน Railway ผ่านตัวขับเคลื่อนสำเร็จรูป)
 # ==============================================================================
-# เปลี่ยนมาใช้ไดรเวอร์ pg8000 เพื่อแก้ปัญหาคอมไพล์ไม่ผ่านบน Python 3.13 การันตีบิลด์ผ่านฉลุย
+# ใช้โครงสร้างมาตรฐานร่วมกับ psycopg3 (binary) เพื่อแก้ปัญหาคอมไพล์ไม่ผ่านบน Python 3.13 ของ Railway
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -64,11 +64,17 @@ DATABASES = {
         'PASSWORD': 'itdycDDkceMnyapCLsIqdUaYJXusPmXX',
         'HOST': 'django-checkin-db.railway.internal',
         'PORT': '5432',
-        'OPTIONS': {
-            'driver': 'pg8000',
-        },
     }
 }
+
+# 🛡️ ระบบเซฟตี้ดักจับ: หากรันทดสอบในเครื่องคอมพิวเตอร์พี่ (Local) จะสลับไปใช้ SQLite อัตโนมัติ ไม่ให้ระบบเอ๋อ
+if os.environ.get('DEBUG', 'True') == 'True' and not os.environ.get('RAILWAY_ENVIRONMENT_ID'):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 # ==============================================================================
 
 # Password validation
