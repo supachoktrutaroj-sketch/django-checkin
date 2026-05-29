@@ -92,7 +92,7 @@
                     style="background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"292.4\" height=\"292.4\" viewBox=\"0 0 292.4 292.4\"><path fill=\"%23a0aec0\" d=\"M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z\"/></svg>'); background-repeat: no-repeat; background-position: right 1rem top 50%; background-size: 0.65rem auto;">
                     <option value="">📁 กองร้อยทั้งหมด</option>
                     {% for key, val in company_choices %}
-                        <option value="{{ key }}" {% if filter_company == key %}selected{% endif %}>
+                        <option value="{{ key }}" {% if company_filter == key or filter_company == key %}selected{% endif %}>
                             {{ val }}
                         </option>
                     {% endfor %}
@@ -275,11 +275,9 @@ function openEdit(id, fn, ln, ph, company, status, rd){
     document.getElementById('ph').value = ph;
     document.getElementById('st').value = status; 
     
-    // 🛠️ ส่วนปรับปรุงแก้ไข: ป้องกันไม่ให้ส่งค่ากองร้อยว่างเปล่า (Null) ไปที่ฐานข้อมูล
     const companySelect = document.getElementById('co');
     companySelect.value = company;
     
-    // ดักไว้หากเบราว์เซอร์ล้างค่าจน selectedIndex หลุดเป็น -1 จะบังคับให้เลือกกองร้อยแรกเป็นค่าเริ่มต้น
     if (companySelect.selectedIndex === -1) {
         companySelect.selectedIndex = 0;
     }
