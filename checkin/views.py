@@ -715,8 +715,17 @@ def admin_dashboard(request):
         user__is_active=True
     )
 
+    # 🛠️ [จุดแก้ไข] แปลงข้อความภาษาไทยจากหน้าเว็บให้เป็น "ตัวเลข" เพื่อให้ค้นหาในฐานข้อมูลเจอ
     if company_filter:
-        profiles_query = profiles_query.filter(company=company_filter)
+        mapped_company = company_filter
+        if "ร้อย.1" in company_filter or "1" in company_filter:
+            mapped_company = "1"
+        elif "ร้อย.2" in company_filter or "2" in company_filter:
+            mapped_company = "2"
+        elif "ร้อย.3" in company_filter or "3" in company_filter:
+            mapped_company = "3"
+            
+        profiles_query = profiles_query.filter(company=mapped_company)
 
     total_on_time = profiles_query.filter(return_status='ON_TIME').count()
     total_late = profiles_query.filter(return_status='LATE').count()
@@ -905,37 +914,51 @@ def edit_user_admin(request, user_id):
 @require_POST
 def save_leave_settings(request, user_id):
     """
-    🛠️ เพิ่มใหม่: ฟังก์ชันรองรับการกด 'บันทึกข้อมูล' จากป๊อปอัปตั้งค่าวันลา (ภาพที่ 6)
-    คำนวณวันขากลับอัตโนมัติ (วันปล่อย + จำนวนวันลา) และรวมร่างกับเวลาเดดไลน์
+    🛠️ ฟังก์ชันรองรับการกด 'บันทึกข้อมูล' จากป๊อปอัปตั้งค่าวันลา 
+    คำนวณวันขากลับอัตโนมัติ (วันปล่อย + จำนวนวันลา) และรวมร่างกับเวลาเดดไลน์อย่างสมบูรณ์
     """
     profile = get_object_or_404(UserProfile, user_id=user_id)
+    
+    # ดึงค่าจาก HTML (แก้ไขจับคู่ชื่อฟิลด์ leave_days ให้ตรงกับหน้าหน้ากากเว็บแล้ว)
     start_date_str = request.POST.get('start_date')
-    num_days_str = request.POST.get('num_days', '0')
+    leave_days_str = request.POST.get('leave_days', '0')  # 👈 เปลี่ยนจาก num_days เป็น leave_days
     return_time_str = request.POST.get('return_time', '18:00')
 
     if start_date_str:
         try:
+            # 1. แปลงสตริงวันที่และจำนวนวันลา
             start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            num_days = int(num_days_str)
-            return_date = start_date + timedelta(days=num_days)
+            leave_days = int(leave_days_str)
             
+            # 2. คำนวณวันขากลับ (วันปล่อยตัว + จำนวนวันลา)
+            return_date = start_date + timedelta(days=leave_days)
+            
+            # 3. รวมวันขากลับและเวลาเดดไลน์เข้าด้วยกันเป็นหนึ่งเดียว
             datetime_combined_str = f"{return_date} {return_time_str}"
             naive_datetime = datetime.strptime(datetime_combined_str, "%Y-%m-%d %H:%M")
             
+            # 4. ฝัง Timezone 'Asia/Bangkok' ให้ถูกต้องป้องกันเวลาเคลื่อนใน Database
             bangkok_tz = pytz.timezone('Asia/Bangkok')
             aware_datetime = timezone.make_aware(naive_datetime, bangkok_tz)
             
+            # 5. บันทึกข้อมูลลงสู่ฐานข้อมูล
             profile.start_date = start_date
             profile.individual_return_deadline = aware_datetime
             profile.person_status = 'leave'
             profile.return_status = 'PENDING'
             profile.save()
             
-            messages.success(request, f'⏳ ตั้งค่าวันลาและคำนวณเดดไลน์ขากลับของ {profile.user.first_name} สำเร็จ!')
+            # ดึงชื่อแสดงผลอย่างปลอดภัย (ถ้าไม่มี first_name ให้ใช้ full_name หรือ username)
+            display_name = profile.user.first_name if profile.user.first_name else profile.full_name
+            messages.success(request, f'⏳ ตั้งค่าวันลาและคำนวณเดดไลน์ขากลับของ {display_name} สำเร็จ!')
+            
         except Exception as e:
             messages.error(request, f'เกิดข้อผิดพลาดในการคำนวณเวลาขากลับ: {str(e)}')
+    else:
+        messages.error(request, 'ไม่ได้รับข้อมูลวันที่เริ่มต้นการปล่อยตัว')
             
-    return redirect('manage_users')
+    # รีไดเรกต์กลับไปที่หน้าหลักอย่างปลอดภัย
+    return redirect(request.META.get('HTTP_REFERER', 'manage_users'))
 
 
 @login_required

@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 
 {% block content %}
-
 <style>
     .admin-header {
         margin-bottom: 24px;
@@ -356,7 +355,7 @@
     <div class="box-header-flex">
         <div class="box-title">🚨 {{ table_title }}</div>
         
-        <form method="GET" class="d-flex gap-2 align-items-center" style="display: flex; gap: 8px;">
+        <form method="GET" style="display: flex; gap: 8px; align-items: center;">
             <input type="hidden" name="filter" value="{{ status_filter }}">
             <select name="company" style="padding: 8px 12px; font-weight: 800; border-radius: 10px; border: 1px solid #cbd5e1;" onchange="this.form.submit()">
                 <option value="">-- กองร้อยทั้งหมด --</option>
@@ -454,7 +453,6 @@
             <form id="modalLeaveForm" method="POST" action="">
                 {% csrf_token %}
                 <div class="modal-body p-4 text-start">
-                    
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-secondary small">วันที่เริ่มปล่อยตัว</label>
@@ -490,7 +488,6 @@
         </div>
     </div>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
@@ -561,24 +558,24 @@
 
     function updateClock() {
         const now = new Date();
+        const deadlineText = "{{ system_setting.checkin_start_time|time:'H:i' }}".trim();
         
-        // แก้ไขตรงนี้ดึงค่าฟิลด์กลางของฐานข้อมูล checkin_start_time อย่างปลอดภัย
-        const deadlineText = "{{ system_setting.checkin_start_time|time:'H:i' }}";
-        if (!deadlineText || deadlineText === "None") {
+        if (!deadlineText || deadlineText === "None" || !deadlineText.includes(':')) {
             const el = document.getElementById("deadline-status");
             if (el) el.innerHTML = "⏳ ไม่พบข้อมูลเวลากลาง";
             return;
         }
         
-        const [h, m] = deadlineText.split(":").map(Number);
+        const parts = deadlineText.split(":");
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
 
-        // ป้องกันปัญหาข้ามวัน โดยเซ็ตค่าชั่วโมงและนาทีมาตรฐานให้สอดคล้องกับวันปัจจุบัน
         const deadline = new Date();
         deadline.setHours(h, m, 0, 0);
 
         const day = String(now.getDate()).padStart(2, '0');
         const month = String(now.getMonth() + 1).padStart(2, '0');
-        const year = now.getFullYear() + 543; // แปลงพุทธศักราชสำหรับแสดงผล
+        const year = now.getFullYear() + 543; 
 
         const hh = String(now.getHours()).padStart(2, '0');
         const mm = String(now.getMinutes()).padStart(2, '0');
@@ -592,7 +589,6 @@
         const el = document.getElementById("deadline-status");
         if (el) {
             if (now > deadline) {
-                // หากเวลาปัจจุบันเกินกำหนดเวลากลางไปแล้ว
                 const diffMs = now - deadline;
                 const diffMins = Math.floor(diffMs / 60000);
                 const diffSecs = Math.floor((diffMs % 60000) / 1000);
@@ -601,7 +597,6 @@
                 el.style.background = "#fee2e2";
                 el.style.color = "#991b1b";
             } else {
-                // หากยังอยู่ในช่วงเวลาก่อนหน้ากำหนดเวลากลาง
                 const diffMs = deadline - now;
                 const diffMins = Math.floor(diffMs / 60000);
                 const diffSecs = Math.floor((diffMs % 60000) / 1000);
@@ -616,7 +611,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         setupModalLivePreview();
         updateClock();
-        setInterval(updateClock, 1000); // อัปเดตแบบเรียลไทม์ทุก ๆ 1 วินาที
+        setInterval(updateClock, 1000);
     });
 </script>
 {% endblock %}
