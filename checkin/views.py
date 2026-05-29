@@ -759,7 +759,7 @@ def manage_users(request):
         company = request.POST.get('company')
         person_status = request.POST.get('person_status')
         
-        # รับค่าจากกล่อง Input type="date" (ซึ่งยังคงใช้ชื่ออินพุตเดิมว่า return_date)
+        # รับค่าจากกล่อง Input type="date"
         return_date_raw = request.POST.get('return_date')
 
         try:
@@ -770,7 +770,11 @@ def manage_users(request):
 
             profile = user.profile
             profile.phone_number = phone_number
-            profile.company = company
+            
+            # ป้องกัน IntegrityError (ถ้าดักจาก JS แล้วยังหลุดมา หลังบ้านจะไม่ยอมบันทึกค่าว่าง)
+            if company:
+                profile.company = company
+                
             profile.person_status = person_status
             
             # 🟢 ปรับเปลี่ยนตรงนี้: เซฟลงตัวแปรจริงตามโครงสร้างโมเดล
@@ -784,10 +788,22 @@ def manage_users(request):
             else:
                 profile.individual_return_deadline = None # ถ้าไม่ได้เลือกวันที่มา ให้เคลียร์เป็นค่าว่าง
 
+            # 🛠️ [ท่อนที่เพิ่มเข้ามาแก้ไขบั๊ก] ซิงค์ค่าของสถานะส่งให้หน้า Admin Dashboard
+            if person_status == 'normal':
+                # ถ้าแอดมินยืนยันว่าเขาอยู่ค่าย "ปกติ" แล้ว -> ให้เคลียร์สถานะแดชบอร์ดเป็น กลับทันเวลา หรือค่าว่าง (ขึ้นอยู่กับระบบพี่ดีไซน์)
+                # ในที่นี้แนะนำให้เปลี่ยนเป็น 'ON_TIME' (หรือใส่เป็นค่าว่างตามที่ Logic แดชบอร์ดพี่เช็กครับ)
+                profile.return_status = 'ON_TIME' 
+                profile.individual_return_deadline = None # กลับมาแล้ว ไม่จำเป็นต้องมีกำหนดส่งกลับค้างไว้
+            else:
+                # ถ้าสถานะเป็น ลาพัก/ไปราชการ (ไม่ใช่ normal) และเพิ่งตั้งกำหนดวันกลับมา
+                # ให้ปรับสถานะใน Dashboard กลับไปเป็น 'PENDING' (รอรายงานตัว) อีกครั้ง
+                profile.return_status = 'PENDING'
+
             profile.save()
             messages.success(request, "อัปเดตข้อมูลกำลังพลเรียบร้อยแล้ว!")
         except User.DoesNotExist:
             messages.error(request, "ไม่พบข้อมูลกำลังพลในระบบ")
+            
     # -------------------------------------------------------------
     # โค้ดส่วนดึงข้อมูลเดิมของคุณ (ไม่มีการแก้ไข)
     users_queryset = User.objects.filter(
