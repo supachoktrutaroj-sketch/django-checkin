@@ -105,7 +105,7 @@
             </div>
 
             <div class="flex gap-2">
-                <button class="bg-slate-800 hover:bg-slate-950 text-white px-6 py-2.5 rounded-xl font-medium text-sm transition shadow-sm flex-1 md:flex-none">
+                <button type="submit" class="bg-slate-800 hover:bg-slate-950 text-white px-6 py-2.5 rounded-xl font-medium text-sm transition shadow-sm flex-1 md:flex-none">
                     ค้นหา
                 </button>
 
@@ -132,7 +132,6 @@
 
                 <tbody class="divide-y divide-slate-100 text-slate-600 font-normal">
                     {% for u in users %}
-                    {% if not u.is_staff %}
                     <tr class="hover:bg-slate-50/50 transition">
 
                         <td class="px-6 py-4 font-bold text-blue-600">
@@ -177,7 +176,7 @@
                                         '{{ u.profile.phone_number }}',
                                         '{{ u.profile.company }}',
                                         '{{ u.profile.person_status }}',
-                                        '{{ u.profile.return_date|date:'Y-m-d' }}'
+                                        '{{ u.profile.return_date|date:\'Y-m-d\' }}'
                                     )"
                                     class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#f59e0b] hover:bg-amber-600 text-white font-medium text-xs transition shadow-sm">
                                     ✏️ แก้ไข
@@ -192,7 +191,6 @@
                         </td>
 
                     </tr>
-                    {% endif %}
                     {% empty %}
                     <tr>
                         <td colspan="7" class="px-6 py-12 text-center text-slate-400 font-normal">
@@ -278,6 +276,14 @@
                 <input id="ph" name="phone_number" class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500">
             </div>
             <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">สังกัดกองร้อย</label>
+                <select id="co" name="company" class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none bg-white">
+                    {% for key, val in company_choices %}
+                        <option value="{{ key }}">{{ val }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
                 <label class="block text-xs font-bold text-slate-400 uppercase mb-1">กำหนดวันกลับเข้ากรม</label>
                 <input id="rd" type="date" name="return_date" class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-600">
             </div>
@@ -303,6 +309,7 @@ function openEdit(id, fn, ln, ph, company, status, rd){
     document.getElementById('fn').value = fn;
     document.getElementById('ln').value = ln;
     document.getElementById('ph').value = ph;
+    document.getElementById('co').value = company; // ส่งค่าสังกัดกองร้อยเดิมเข้าช่องแก้
     document.getElementById('rd').value = rd;
 
     toggleEdit(true);
