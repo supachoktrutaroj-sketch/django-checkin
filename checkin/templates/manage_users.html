@@ -78,7 +78,7 @@
 
         </div>
 
-        <form method="GET" class="flex flex-col md:flex-row gap-3 mb-6">
+        <form method="GET" action="{% url 'manage_users' %}" class="flex flex-col md:flex-row gap-3 mb-6">
             <div class="relative flex-1">
                 <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 text-sm">🔍</span>
                 <input type="text" name="search" value="{{ search_query }}"
@@ -92,7 +92,7 @@
                     style="background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"292.4\" height=\"292.4\" viewBox=\"0 0 292.4 292.4\"><path fill=\"%23a0aec0\" d=\"M287 69.4a17.6 17.6 0 0 0-13-5.4H18.4c-5 0-9.3 1.8-12.9 5.4A17.6 17.6 0 0 0 0 82.2c0 5 1.8 9.3 5.4 12.9l128 127.9c3.6 3.6 7.8 5.4 12.8 5.4s9.2-1.8 12.8-5.4L287 95c3.5-3.5 5.4-7.8 5.4-12.8 0-5-1.9-9.2-5.5-12.8z\"/></svg>'); background-repeat: no-repeat; background-position: right 1rem top 50%; background-size: 0.65rem auto;">
                     <option value="">📁 กองร้อยทั้งหมด</option>
                     {% for key, val in company_choices %}
-                        <option value="{{ key }}" {% if company_filter == key or filter_company == key %}selected{% endif %}>
+                        <option value="{{ key }}" {% if company_filter == key or filter_company == key or company_filter == val %}selected{% endif %}>
                             {{ val }}
                         </option>
                     {% endfor %}
@@ -214,7 +214,7 @@
             <button onclick="toggleEdit(false)" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
         </div>
 
-        <form id="editForm" method="POST" action="" class="p-6 space-y-4">
+        <form id="editForm" method="POST" action="{% url 'manage_users' %}" class="p-6 space-y-4">
             {% csrf_token %}
             <input type="hidden" name="user_id" id="edit_user_id">
 
@@ -268,7 +268,8 @@ function toggleEdit(v){
 }
 
 function openEdit(id, fn, ln, ph, company, status, rd){
-    document.getElementById('editForm').action = ""; 
+    // 🛠️ กำหนดปลายทาง action ตอนกดส่งแก้ไขให้แม่นยำชัดเจน
+    document.getElementById('editForm').action = "{% url 'manage_users' %}"; 
     document.getElementById('edit_user_id').value = id;
     document.getElementById('fn').value = fn;
     document.getElementById('ln').value = ln;
