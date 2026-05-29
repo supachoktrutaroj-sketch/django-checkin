@@ -30,7 +30,7 @@
                     </p>
                 </div>
             </div>
-            </div>
+        </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
             
@@ -273,8 +273,16 @@ function openEdit(id, fn, ln, ph, company, status, rd){
     document.getElementById('fn').value = fn;
     document.getElementById('ln').value = ln;
     document.getElementById('ph').value = ph;
-    document.getElementById('co').value = company; 
     document.getElementById('st').value = status; 
+    
+    // 🛠️ ส่วนปรับปรุงแก้ไข: ป้องกันไม่ให้ส่งค่ากองร้อยว่างเปล่า (Null) ไปที่ฐานข้อมูล
+    const companySelect = document.getElementById('co');
+    companySelect.value = company;
+    
+    // ดักไว้หากเบราว์เซอร์ล้างค่าจน selectedIndex หลุดเป็น -1 จะบังคับให้เลือกกองร้อยแรกเป็นค่าเริ่มต้น
+    if (companySelect.selectedIndex === -1) {
+        companySelect.selectedIndex = 0;
+    }
     
     const dateInput = document.getElementById('rd');
     if (rd && rd !== 'None' && rd !== '-') {
