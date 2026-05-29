@@ -26,16 +26,11 @@
                         ระบบจัดการข้อมูลกำลังพล
                     </h1>
                     <p class="text-slate-400 text-xs mt-1 font-normal">
-                        เพิ่ม ลบ ค้นหา และปรับปรุงสถานะการปฏิบัติหน้าที่
+                        ค้นหา และปรับปรุงสถานะการปฏิบัติหน้าที่
                     </p>
                 </div>
             </div>
-
-            <button onclick="toggleAdd(true)"
-                class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm shadow-sm transition flex items-center gap-2 self-start md:self-auto">
-                <span>➕</span> เพิ่มกำลังพลใหม่
-            </button>
-        </div>
+            </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
             
@@ -147,36 +142,41 @@
                         </td>
 
                         <td class="px-6 py-4 text-slate-400">
-                            {{ u.profile.get_company_display|default:"-" }}
+                            {{ u.profile.get_company_display_thai|default:"-" }}
                         </td>
 
                         <td class="px-6 py-4 text-slate-400">
                             {% if u.profile.person_status == 'normal' %}
-                                <span class="text-emerald-600 font-medium">ปกติ</span>
+                                <span class="text-emerald-600 font-medium">ปกติ (อยู่ในค่าย)</span>
                             {% elif u.profile.person_status == 'leave' %}
-                                <span class="text-amber-500 font-medium">ลา</span>
+                                <span class="text-amber-500 font-medium">ลาพัก</span>
+                            {% elif u.profile.person_status == 'mission' %}
+                                <span class="text-blue-500 font-medium">ไปราชการ</span>
                             {% elif u.profile.person_status == 'official' %}
-                                <span class="text-blue-500 font-medium">ราชการ</span>
+                                <span class="text-indigo-500 font-medium">ปฏิบัติภารกิจนอกค่าย</span>
+                            {% elif u.profile.person_status == 'home' %}
+                                <span class="text-slate-500 font-medium">กลับบ้าน / ออกกรม</span>
                             {% else %}
                                 <span class="text-slate-400">-</span>
                             {% endif %}
                         </td>
 
-                        <td class="px-6 py-4 text-slate-400">
-                            {{ u.profile.return_date|date:"d/m/Y"|default:"-" }}
+                        <td class="px-6 py-4 text-slate-400 font-medium">
+                            {{ u.profile.individual_return_deadline|date:"d/m/Y"|default:"-" }}
                         </td>
 
                         <td class="px-6 py-4">
+                            {% firstof u.profile.individual_return_deadline|date:"Y-m-d" "" as current_rd_val %}
                             <div class="flex items-center justify-center gap-2">
                                 <button
                                     onclick="openEdit(
                                         '{{ u.id }}',
                                         '{{ u.first_name }}',
                                         '{{ u.last_name }}',
-                                        '{{ u.profile.phone_number }}',
-                                        '{{ u.profile.company }}',
-                                        '{{ u.profile.person_status }}',
-                                        '{{ u.profile.return_date|date:"Y-m-d" }}'
+                                        '{{ u.profile.phone_number|default:'' }}',
+                                        '{{ u.profile.company|default:'' }}',
+                                        '{{ u.profile.person_status|default:'' }}',
+                                        '{{ current_rd_val }}'
                                     )"
                                     class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#f59e0b] hover:bg-amber-600 text-white font-medium text-xs transition shadow-sm">
                                     ✏️ แก้ไข
@@ -205,51 +205,6 @@
     </div>
 </div>
 
-<div id="addModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div class="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-                <span>➕</span> เพิ่มกำลังพลใหม่
-            </h2>
-            <button onclick="toggleAdd(false)" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
-        </div>
-
-        <form method="POST" action="{% url 'add_user_admin' %}" class="p-6 space-y-4">
-            {% csrf_token %}
-            <div>
-                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Username</label>
-                <input name="username" placeholder="ระบุ Username" required class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500">
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">ชื่อ</label>
-                    <input name="first_name" placeholder="ชื่อ" required class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">นามสกุล</label>
-                    <input name="last_name" placeholder="นามสกุล" required class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500">
-                </div>
-            </div>
-            <div>
-                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">เบอร์โทรศัพท์</label>
-                <input name="phone_number" placeholder="เบอร์โทรศัพท์" class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500">
-            </div>
-            <div>
-                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">สังกัดกองร้อย</label>
-                <select name="company" class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none bg-white">
-                    {% for key, val in company_choices %}
-                        <option value="{{ key }}">{{ val }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="flex justify-end gap-2 pt-2 mt-4">
-                <button type="button" onclick="toggleAdd(false)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 font-medium text-sm rounded-xl transition">ปิด</button>
-                <button class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-xl shadow-sm transition">บันทึก</button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <div id="editModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <div class="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
@@ -259,8 +214,10 @@
             <button onclick="toggleEdit(false)" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
         </div>
 
-        <form id="editForm" method="POST" class="p-6 space-y-4">
+        <form id="editForm" method="POST" action="" class="p-6 space-y-4">
             {% csrf_token %}
+            <input type="hidden" name="user_id" id="edit_user_id">
+
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-1">ชื่อ</label>
@@ -283,34 +240,48 @@
                     {% endfor %}
                 </select>
             </div>
+            
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">สถานะการปฏิบัติหน้าที่</label>
+                <select id="st" name="person_status" class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none bg-white">
+                    {% for key, val in status_choices %}
+                        <option value="{{ key }}">{{ val }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
             <div>
                 <label class="block text-xs font-bold text-slate-400 uppercase mb-1">กำหนดวันกลับเข้ากรม</label>
                 <input id="rd" type="date" name="return_date" class="w-full border border-slate-200 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-600">
             </div>
             <div class="flex justify-end gap-2 pt-2 mt-4">
                 <button type="button" onclick="toggleEdit(false)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 font-medium text-sm rounded-xl transition">ปิด</button>
-                <button class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-medium text-sm rounded-xl shadow-sm transition">อัปเดต</button>
+                <button type="submit" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-medium text-sm rounded-xl shadow-sm transition">อัปเดต</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-function toggleAdd(v){
-    document.getElementById('addModal').classList.toggle('hidden', !v);
-}
-
 function toggleEdit(v){
     document.getElementById('editModal').classList.toggle('hidden', !v);
 }
 
 function openEdit(id, fn, ln, ph, company, status, rd){
-    document.getElementById('editForm').action = `/manage-users/edit/${id}/`;
+    document.getElementById('editForm').action = ""; 
+    document.getElementById('edit_user_id').value = id;
     document.getElementById('fn').value = fn;
     document.getElementById('ln').value = ln;
     document.getElementById('ph').value = ph;
-    document.getElementById('co').value = company; // ส่งค่าสังกัดกองร้อยเดิมเข้าช่องแก้
-    document.getElementById('rd').value = rd;
+    document.getElementById('co').value = company; 
+    document.getElementById('st').value = status; 
+    
+    const dateInput = document.getElementById('rd');
+    if (rd && rd !== 'None' && rd !== '-') {
+        dateInput.value = rd;
+    } else {
+        dateInput.value = "";
+    }
 
     toggleEdit(true);
 }

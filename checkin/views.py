@@ -751,6 +751,45 @@ def admin_dashboard(request):
 @login_required
 @user_passes_test(is_admin_or_staff)
 def manage_users(request):
+    if request.method == 'POST':
+        user_id = request.POST.get('user_id')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        phone_number = request.POST.get('phone_number')
+        company = request.POST.get('company')
+        person_status = request.POST.get('person_status')
+        
+        # รับค่าจากกล่อง Input type="date" (ซึ่งยังคงใช้ชื่ออินพุตเดิมว่า return_date)
+        return_date_raw = request.POST.get('return_date')
+
+        try:
+            user = User.objects.get(id=user_id)
+            user.first_name = first_name
+            user.last_name = last_name
+            user.save()
+
+            profile = user.profile
+            profile.phone_number = phone_number
+            profile.company = company
+            profile.person_status = person_status
+            
+            # 🟢 ปรับเปลี่ยนตรงนี้: เซฟลงตัวแปรจริงตามโครงสร้างโมเดล
+            if return_date_raw:
+                try:
+                    # ผสมวันที่จากฟอร์มเข้ากับเวลาเย็น 18:00:00 เพื่อให้เป็น DateTime
+                    datetime_str = f"{return_date_raw} 18:00:00"
+                    profile.individual_return_deadline = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    profile.individual_return_deadline = None
+            else:
+                profile.individual_return_deadline = None # ถ้าไม่ได้เลือกวันที่มา ให้เคลียร์เป็นค่าว่าง
+
+            profile.save()
+            messages.success(request, "อัปเดตข้อมูลกำลังพลเรียบร้อยแล้ว!")
+        except User.DoesNotExist:
+            messages.error(request, "ไม่พบข้อมูลกำลังพลในระบบ")
+    # -------------------------------------------------------------
+    # โค้ดส่วนดึงข้อมูลเดิมของคุณ (ไม่มีการแก้ไข)
     users_queryset = User.objects.filter(
         is_superuser=False,
         is_staff=False
