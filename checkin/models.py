@@ -1,7 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+
 class CheckInRecord(models.Model):
+
     ACTION_CHOICES = [
         ('checkin', 'Check In'),
         ('checkout', 'Check Out'),
@@ -23,9 +25,9 @@ class CheckInRecord(models.Model):
     )
 
     latitude = models.FloatField()
+
     longitude = models.FloatField()
 
-    # 🛠️ เปลี่ยนชื่อเพื่อให้ตรงกับ views.py ที่ส่งมาเป็น distance_meters
     distance_meters = models.FloatField(
         default=0
     )
@@ -36,7 +38,6 @@ class CheckInRecord(models.Model):
         default='present'
     )
 
-    # 🛠️ ฟิลด์เก็บประเภทการยืนยันตัวตน (เช่น 'face')
     verification_method = models.CharField(
         max_length=50,
         blank=True,
@@ -44,7 +45,6 @@ class CheckInRecord(models.Model):
         default='face'
     )
 
-    # 🛠️ ฟิลด์เก็บคะแนนความมั่นใจใบหน้าจากการสแกน
     confidence_score = models.FloatField(
         default=0.0,
         blank=True,
@@ -61,6 +61,7 @@ class CheckInRecord(models.Model):
 
 
 class SystemSetting(models.Model):
+
     checkin_start_time = models.TimeField(
         default="08:00"
     )
@@ -73,7 +74,6 @@ class SystemSetting(models.Model):
         default="18:00"
     )
 
-    # 📍 พิกัดศูนย์กลางหน่วยงาน (กำหนดพิกัดเริ่มต้นเป็น บก.ทบ.)
     latitude = models.FloatField(
         default=13.819810,
         verbose_name="ละติจูดที่ตั้งหน่วย"
@@ -97,14 +97,14 @@ class SystemSetting(models.Model):
 
 
 class UserProfile(models.Model):
-    # 🛠️ ปรับเปลี่ยน Choices ให้รองรับข้อมูลแบบ String ตรงตามหน้าฟอร์ม Modal (ภาพที่ 5)
+
     COMPANY_CHOICES = [
-        ('ร้อย.บก.', 'กองร้อยกองบังคับการ (ร้อย.บก.)'),
-        ('ร้อย.1', 'กองร้อยที่ 1'),
-        ('ร้อย.2', 'กองร้อยที่ 2'),
-        ('ร้อย.3', 'กองร้อยที่ 3'),
-        ('ร้อย.4', 'กองร้อยที่ 4'),
-        ('ร้อย.สสห.', 'กองร้อยสนับสนุน (ร้อย.สสห.)'),
+        ('กองร้อยกองบังคับการ', 'กองร้อยกองบังคับการ'),
+        ('กองร้อยที่ 1', 'กองร้อยที่ 1'),
+        ('กองร้อยที่ 2', 'กองร้อยที่ 2'),
+        ('กองร้อยที่ 3', 'กองร้อยที่ 3'),
+        ('กองร้อยที่ 4', 'กองร้อยที่ 4'),
+        ('กองร้อยสนับสนุน', 'กองร้อยสนับสนุน'),
     ]
 
     PERSON_STATUS_CHOICES = [
@@ -115,7 +115,6 @@ class UserProfile(models.Model):
         ('home', 'กลับบ้าน / ออกกรม'),
     ]
 
-    # ➕ ตัวเลือกสถานะการกลับเข้ากรมสไตล์ทหาร
     RETURN_STATUS_CHOICES = [
         ('PENDING', 'ยังไม่รายงานตัว ⏳'),
         ('ON_TIME', 'กลับทันเวลา ✅'),
@@ -135,9 +134,9 @@ class UserProfile(models.Model):
     )
 
     company = models.CharField(
-        max_length=20,
+        max_length=50,
         choices=COMPANY_CHOICES,
-        default='ร้อย.บก.'
+        default='กองร้อยกองบังคับการ'
     )
 
     person_status = models.CharField(
@@ -146,21 +145,18 @@ class UserProfile(models.Model):
         default='normal'
     )
 
-    # 🛠️ ฟิลด์เก็บ "วันที่เริ่มต้น" ออกกรมหรือเริ่มลา
     start_date = models.DateField(
         blank=True,
         null=True,
         verbose_name="วันที่เริ่มต้นออกกรม"
     )
 
-    # 🛠️ ทั้งวันที่และเวลา ที่ต้องกลับของรายบุคคล (เดดไลน์)
     individual_return_deadline = models.DateTimeField(
         blank=True,
         null=True,
         verbose_name="วันและเวลากลับเข้ากรมรายบุคคล"
     )
 
-    # ➕ ฟิลด์บันทึกสถานะว่าทันเดดไลน์รายบุคคลนั้น ๆ หรือไม่
     return_status = models.CharField(
         max_length=20,
         choices=RETURN_STATUS_CHOICES,
@@ -178,7 +174,6 @@ class UserProfile(models.Model):
         db_index=True
     )
 
-    # 🛠️ ดึงชื่อเต็มของสังกัดกองร้อยภาษาไทย
     def get_company_display_thai(self):
         if self.company and self.company in dict(self.COMPANY_CHOICES):
             return dict(self.COMPANY_CHOICES).get(self.company)
@@ -188,26 +183,27 @@ class UserProfile(models.Model):
         if self.person_status and self.person_status in dict(self.PERSON_STATUS_CHOICES):
             return dict(self.PERSON_STATUS_CHOICES).get(self.person_status)
         return "ปกติ"
-    
+
     def get_return_status_display_thai(self):
         if self.return_status and self.return_status in dict(self.RETURN_STATUS_CHOICES):
             return dict(self.RETURN_STATUS_CHOICES).get(self.return_status)
         return "ยังไม่รายงานตัว ⏳"
 
-    # 🛠️ ฟังก์ชันคำนวณนับถอยหลังวันขากลับเข้ากรมอัตโนมัติ 
     def get_days_remaining(self):
         from datetime import date
+
         if self.individual_return_deadline:
             target_date = self.individual_return_deadline.date()
             today = date.today()
             delta = target_date - today
-            
+
             if delta.days > 0:
                 return f"เหลืออีก {delta.days} วัน"
             elif delta.days == 0:
                 return "ครบกำหนดกลับวันนี้"
             else:
                 return f"เกินกำหนด {abs(delta.days)} วัน"
+
         return "-"
 
     def is_returned(self):
@@ -226,6 +222,7 @@ class UserProfile(models.Model):
     def full_name(self):
         if self.user.first_name or self.user.last_name:
             return f"{self.user.first_name} {self.user.last_name}".strip()
+
         return self.user.username
 
     def __str__(self):
@@ -233,6 +230,7 @@ class UserProfile(models.Model):
 
 
 class UserFaceProfile(models.Model):
+
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
