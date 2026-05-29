@@ -1,11 +1,14 @@
 #!/bin/bash
 set -o errexit
 
-# 1. ติดตั้งแพ็กเกจหลักทั้งหมดจาก requirements.txt
+# ติดตั้ง dependencies
 pip install -r requirements.txt
 
-# 2. ติดตั้ง gunicorn เสริมบน Railway Server
+# ติดตั้ง gunicorn
 pip install gunicorn
 
-# 3. จัดการไฟล์ Static
+# collect static
 python manage.py collectstatic --noinput
+
+# migrate database
+python manage.py migrate
