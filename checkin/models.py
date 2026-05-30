@@ -98,13 +98,12 @@ class SystemSetting(models.Model):
 
 class UserProfile(models.Model):
 
-    # 🛠️ ปรับตัวเลือกสุดท้ายจาก 'กองร้อยสนับสนุน' เป็น '5' เพื่อให้ตรงกับโครงสร้างข้อมูลจริงใน Database
+    # 🟢 1. เอา 'กองร้อยกองบังคับการ' ออก เหลือเพียง กองร้อย 1-5 อย่างเป็นทางการครับ
     COMPANY_CHOICES = [
-        ('กองร้อยกองบังคับการ', 'กองร้อยกองบังคับการ'),
-        ('กองร้อยที่ 1', 'กองร้อยที่ 1'),
-        ('กองร้อยที่ 2', 'กองร้อยที่ 2'),
-        ('กองร้อยที่ 3', 'กองร้อยที่ 3'),
-        ('กองร้อยที่ 4', 'กองร้อยที่ 4'),
+        ('1', 'กองร้อยที่ 1'),
+        ('2', 'กองร้อยที่ 2'),
+        ('3', 'กองร้อยที่ 3'),
+        ('4', 'กองร้อยที่ 4'),
         ('5', 'กองร้อยที่ 5'), 
     ]
 
@@ -134,10 +133,11 @@ class UserProfile(models.Model):
         null=True
     )
 
+    # 🟢 2. เปลี่ยนค่า default เป็น '1' (เพราะเอา บก. ออกแล้ว) และขยาย max_length เผื่อรองรับข้อความเก่า
     company = models.CharField(
         max_length=50,
         choices=COMPANY_CHOICES,
-        default='กองร้อยกองบังคับการ'
+        default='1'
     )
 
     person_status = models.CharField(
@@ -175,11 +175,19 @@ class UserProfile(models.Model):
         db_index=True
     )
 
-    # 🛠️ ปรับฟังก์ชันแสดงผลภาษาไทยให้ดักจับเลข '5' หรือคำเก่า 'กองร้อยสนับสนุน' ส่งออกเป็นคำว่า "กองร้อยที่ 5"
+    # 🟢 3. เคลียร์ฟังก์ชันแสดงผลภาษาไทย ให้คลีนและกรองได้แม่นยำขึ้น ดักจับค่าเดิมให้เปลี่ยนเป็น กองร้อยที่ 1-5 ทั้งหมด
     def get_company_display_thai(self):
         if self.company:
-            if self.company == '5' or self.company == 'กองร้อยสนับสนุน':
+            # ดักจับกลุ่มกองร้อย 5 (สนับสนุนเดิม)
+            if self.company in ['5', 'กองร้อยสนับสนุน', 'สนน.', 'สนน']:
                 return "กองร้อยที่ 5"
+            # ดักจับกลุ่มเลขเดี่ยว
+            if self.company == '1': return "กองร้อยที่ 1"
+            if self.company == '2': return "กองร้อยที่ 2"
+            if self.company == '3': return "กองร้อยที่ 3"
+            if self.company == '4': return "กองร้อยที่ 4"
+            
+            # หากใน DB มีข้อความภาษาไทยเดิมหลงเหลืออยู่ ให้ดึงจากเงื่อนไขตามตัวเลือก หรือแสดงตามจริง
             if self.company in dict(self.COMPANY_CHOICES):
                 return dict(self.COMPANY_CHOICES).get(self.company)
             return self.company
